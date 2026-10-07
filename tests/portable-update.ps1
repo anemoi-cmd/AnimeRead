@@ -47,7 +47,12 @@ try {
     if ($readerShouldSucceed -and (Test-Path -LiteralPath $readerStage)) { throw 'Successful update left its stage' }
     if ($readerCase -eq 'junction') {
       if ([IO.File]::ReadAllText((Join-Path $readerOutside 'protected.txt')) -ne 'protected link target') { throw 'Link target changed' }
-      Remove-Item -LiteralPath (Join-Path $readerRoot 'runtime')
+      # Windows PowerShell 某些系统版本的 Remove-Item 无法删除 junction。
+      # 非递归 Directory.Delete 只删除已确认的测试链接本身，不跟随目标。
+      $readerLink = [IO.Path]::GetFullPath((Join-Path $readerRoot 'runtime'))
+      if (-not $readerLink.StartsWith($readerQa + '\', [StringComparison]::OrdinalIgnoreCase) -or -not ((Get-Item -LiteralPath $readerLink).Attributes -band [IO.FileAttributes]::ReparsePoint)) { throw 'Unexpected test link' }
+      [IO.Directory]::Delete($readerLink)
+      if ([IO.File]::ReadAllText((Join-Path $readerOutside 'protected.txt')) -ne 'protected link target') { throw 'Link cleanup changed its target' }
     }
     $readerResults += @{case=$readerCase;passed=$true;dataPreserved=$true}
     Write-Output "PASS $readerCase"
