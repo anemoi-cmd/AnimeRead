@@ -208,6 +208,7 @@ const setStylesImportant = (el, styles) => {
 }
 
 class View {
+    #destroyed = false
     #observer = new ResizeObserver(() => this.expand())
     #element = document.createElement('div')
     #iframe = document.createElement('iframe')
@@ -255,6 +256,7 @@ class View {
         return new Promise(resolve => {
             this.#iframe.addEventListener('load', () => {
                 const doc = this.document
+                if (this.#destroyed || !doc?.body) return resolve()
                 afterLoad?.(doc)
 
                 // it needs to be visible for Firefox to get computed style
@@ -283,7 +285,9 @@ class View {
         })
     }
     render(layout) {
-        if (!layout) return
+        // Resize callbacks may arrive during iframe navigation or after close.
+        // Only a live document can receive layout styles.
+        if (this.#destroyed || !layout || !this.document?.body) return
         this.#column = layout.flow !== 'scrolled'
         this.#layout = layout
         if (this.#column) this.columnize(layout)
@@ -364,7 +368,8 @@ class View {
         }
     }
     expand() {
-        const { documentElement } = this.document
+        const documentElement = this.document?.documentElement
+        if (this.#destroyed || !documentElement) return
         if (this.#column) {
             const side = this.#vertical ? 'height' : 'width'
             const otherSide = this.#vertical ? 'width' : 'height'
@@ -420,7 +425,8 @@ class View {
         return this.#overlayer
     }
     destroy() {
-        if (this.document) this.#observer.unobserve(this.document.body)
+        this.#destroyed = true
+        this.#observer.disconnect()
     }
 }
 
@@ -760,7 +766,7 @@ export class Paginator extends HTMLElement {
         return { height, width, margin, gap, columnWidth }
     }
     render() {
-        if (!this.#view) return
+        if (!this.#view?.document?.body) return
         this.#view.render(this.#beforeRender({
             vertical: this.#vertical,
             rtl: this.#rtl,
@@ -1142,18 +1148,23 @@ export class Paginator extends HTMLElement {
         } else $style.textContent = styles
 
         // NOTE: needs `requestAnimationFrame` in Chromium
-        requestAnimationFrame(() =>
-            this.#background.style.background = getBackground(this.#view.document))
+        const view = this.#view
+        requestAnimationFrame(() => {
+            if (this.#view === view && view?.document?.body)
+                this.#background.style.background = getBackground(view.document)
+        })
 
         // needed because the resize observer doesn't work in Firefox
-        this.#view?.document?.fonts?.ready?.then(() => this.#view.expand())
+        view?.document?.fonts?.ready?.then(() => view.expand())
     }
     focusView() {
         this.#view.document.defaultView.focus()
     }
     destroy() {
-        this.#observer.unobserve(this)
-        this.#view.destroy()
+        // The observer watches #container, not this host. Disconnect all targets
+        // and let the destroyed View ignore already queued font/resize work.
+        this.#observer.disconnect()
+        this.#view?.destroy()
         this.#view = null
         this.sections[this.#index]?.unload?.()
         this.#mediaQuery.removeEventListener('change', this.#mediaQueryListener)

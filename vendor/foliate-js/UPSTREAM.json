@@ -10,6 +10,7 @@
     "paginator.js: force-spread attribute honors an explicit two-page choice in portrait windows",
     "paginator.js: continuous wheel/drag navigation crosses chapter boundaries and retains a numeric anchor for image-only pages",
     "paginator.js: keep viewport dimensions for image sizing in continuous flow; remove the inline SVG baseline gap in image-only sections",
-    "paginator.js: release the navigation lock in finally and guard missing adjacent sections at both book ends"
+    "paginator.js: release the navigation lock in finally and guard missing adjacent sections at both book ends",
+    "paginator.js: disconnect actual resize targets and guard iframe, font and frame callbacks after close or during document navigation"
   ]
 }

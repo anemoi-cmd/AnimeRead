@@ -63,6 +63,48 @@ test("损坏格式和连续开关阅读器后仍可恢复 TXT、PDF 错误可见
   });
 });
 
+test("关闭小说后到达的字体和布局回调不会触碰已销毁页面", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto("http://127.0.0.1:1420");
+  await page.getByLabel("导入书籍文件").setInputFiles({
+    name: "font-lifecycle.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(
+      `第一章\n${"关闭之后迟到的字体回调应当安全结束。\n".repeat(100)}`,
+    ),
+  });
+  await expect(page.getByText("正在打开…", { exact: true })).toBeHidden();
+  await page.evaluate(() => {
+    const view = document.querySelector("foliate-view") as HTMLElement & {
+      renderer: {
+        getContents(): { doc: Document }[];
+        setStyles(styles: string): void;
+      };
+    };
+    const runner = window as Window & { releaseReaderFonts?: () => void };
+    const doc = view.renderer.getContents()[0].doc;
+    Object.defineProperty(doc.fonts, "ready", {
+      value: new Promise<void>((resolve) => {
+        runner.releaseReaderFonts = resolve;
+      }),
+      configurable: true,
+    });
+    view.renderer.setStyles("body { font-size: 22px; }");
+  });
+  await page.getByLabel("返回书架", { exact: true }).click();
+  await expect(page.locator("foliate-view")).toHaveCount(0);
+  await page.evaluate(async () => {
+    const runner = window as Window & { releaseReaderFonts?: () => void };
+    runner.releaseReaderFonts?.();
+    delete runner.releaseReaderFonts;
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+  });
+  expect(errors).toEqual([]);
+});
+
 test("真实漫画快速输入、100 次定位和阅读模式循环的资源有界", async ({
   page,
 }) => {
