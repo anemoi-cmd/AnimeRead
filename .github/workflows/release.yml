@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../animeread-build-cache
+      RUSTUP_TOOLCHAIN: stable-x86_64-pc-windows-msvc
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Install tools
+        run: |
+          npm install --global pnpm@11.19.0
+          rustup toolchain install stable-x86_64-pc-windows-msvc --profile minimal --component rustfmt --component clippy
+          if (-not $env:TAURI_SIGNING_PRIVATE_KEY) { throw 'Configure TAURI_SIGNING_PRIVATE_KEY first' }
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Validate code
+        run: |
+          pnpm check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          pnpm audit:code
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          pnpm format:check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          pnpm test
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/cargo.mjs fmt --manifest-path src-tauri/Cargo.toml --check
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/cargo.mjs clippy --release --manifest-path src-tauri/Cargo.toml --locked -- -D warnings
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/cargo.mjs test --release --manifest-path src-tauri/Cargo.toml --locked
+      - name: Build frontend and test UI
+        run: |
+          pnpm build
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          pnpm exec playwright install chromium
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          pnpm test:e2e
+      - name: Package signed release
+        run: |
+          node scripts/setup-enhancement.mjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          pnpm licenses:collect
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/reader.ps1 -Action Package -Toolchain System
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/package-source.mjs
+      - name: Publish complete release
+        run: |
+          $readerVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
+          $readerTag = 'v' + $readerVersion
+          gh release view $readerTag --repo $env:GITHUB_REPOSITORY > $null 2>&1
+          if ($LASTEXITCODE -eq 0) { throw 'Version already published; increment package version first' }
+          $readerNotes = Get-Content latest.json -Raw | ConvertFrom-Json
+          $readerNotes.notes | Set-Content release-notes.txt -Encoding utf8
+          gh release create $readerTag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title "AnimeRead $readerVersion" --notes-file release-notes.txt
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          gh release upload $readerTag --repo $env:GITHUB_REPOSITORY "AnimeRead-$readerVersion-portable.zip" "AnimeRead-$readerVersion-portable.zip.sig" "AnimeRead-$readerVersion-setup.exe" "AnimeRead-$readerVersion-setup.exe.sig" "AnimeRead-source-$readerVersion.zip" latest.json
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          gh release edit $readerTag --repo $env:GITHUB_REPOSITORY --draft=false --latest

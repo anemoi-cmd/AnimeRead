@@ -1,0 +1,54 @@
+name: Verify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/../animeread-build-cache
+      RUSTUP_TOOLCHAIN: stable-x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+      - name: Install pnpm
+        run: npm install --global pnpm@11.19.0
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check TypeScript
+        run: pnpm check
+      - name: Check formatting
+        run: pnpm format:check
+      - name: Check unused code
+        run: pnpm audit:code
+      - name: Test core logic
+        run: pnpm test
+      - name: Build frontend
+        run: pnpm build
+      - name: Install test browser
+        run: pnpm exec playwright install chromium
+      - name: Test general UI and recovery
+        run: pnpm test:e2e
+      - name: Install Rust components
+        run: rustup toolchain install stable-x86_64-pc-windows-msvc --profile minimal --component rustfmt --component clippy
+      - name: Check Rust formatting
+        run: node scripts/cargo.mjs fmt --manifest-path src-tauri/Cargo.toml --check
+      - name: Check native code
+        run: node scripts/cargo.mjs clippy --release --manifest-path src-tauri/Cargo.toml --locked -- -D warnings
+      - name: Test native recovery
+        run: node scripts/cargo.mjs test --release --manifest-path src-tauri/Cargo.toml --locked

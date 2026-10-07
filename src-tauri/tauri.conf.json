@@ -1,0 +1,70 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "AnimeRead",
+  "version": "0.9.5",
+  "identifier": "app.animeread.desktop",
+  "build": {
+    "beforeDevCommand": "node node_modules/vite/bin/vite.js --host 127.0.0.1",
+    "devUrl": "http://127.0.0.1:1420",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "AnimeRead · 小说与漫画",
+        "width": 1280,
+        "height": 850,
+        "minWidth": 820,
+        "minHeight": 600,
+        "center": true,
+        "dragDropEnabled": true,
+        "additionalBrowserArgs": "--force-high-performance-gpu"
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' blob: 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; font-src 'self' blob: data:; frame-src 'self' blob:; worker-src 'self' blob:; connect-src 'self' ipc: http://ipc.localhost https://ipc.localhost; object-src 'none'; base-uri 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "publisher": "",
+    "resources": {
+      "../runtime/": "runtime/"
+    },
+    "icon": [
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "targets": [
+      "nsis"
+    ],
+    "shortDescription": "小说与漫画阅读器",
+    "windows": {
+      "nsis": {
+        "installerHooks": "windows/hooks.nsh",
+        "installMode": "currentUser",
+        "languages": [
+          "SimpChinese"
+        ],
+        "displayLanguageSelector": false
+      },
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      },
+      "minimumWebview2Version": "119.0.2151.40"
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDJDQjAwOTNFQzFEMEQ1Q0QKUldUTjFkREJQZ213TE1BYjdMTkJHa0R4WndBcGFDMHNxVkdyTnE0UDQ2QUc0NU5OY1NNNjNWY2EK",
+      "endpoints": [
+        "https://github.com/anemoi-cmd/AnimeRead/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

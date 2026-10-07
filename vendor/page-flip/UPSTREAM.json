@@ -1,0 +1,14 @@
+{
+  "package": "page-flip",
+  "version": "2.0.7",
+  "repository": "https://github.com/Nodlik/StPageFlip",
+  "upstreamSha256": "b718faafca6856bff51629baedeff601e2cc59482e951105bdbd6e46978cca38",
+  "modifiedSha256": "2aaeef49dd658d8b238e0bbaf3c56531cd614d514705d794e82ea5ff5ce8b444",
+  "patches": [
+    "Stop requestAnimationFrame loop on destroy",
+    "Always remove resize listeners even with mouse events disabled",
+    "Copy canvas bitmap when creating the temporary back of a page",
+    "Copy open Shadow DOM styles and text into temporary pages",
+    "Preserve fractional CSS dimensions in renderer and fold geometry"
+  ]
+}

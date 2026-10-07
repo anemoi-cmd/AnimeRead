@@ -1,0 +1,12 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["src/main.tsx", "scripts/*.mjs", "tests/**/*.ts"],
+  "project": [
+    "src/**/*.{ts,tsx}",
+    "scripts/*.mjs",
+    "tests/**/*.{ts,mjs}",
+    "*.config.ts"
+  ],
+  "ignore": ["vendor/**"],
+  "ignoreDependencies": ["@tauri-apps/cli"]
+}

@@ -1,0 +1,27 @@
+name: Bug report
+description: 报告可复现的阅读器问题
+body:
+  - type: input
+    id: version
+    attributes:
+      label: AnimeRead、Windows 与 WebView2 版本
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 触发操作
+      description: 按顺序描述操作，注明格式、阅读方式和是否开启增强。
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: 实际结果与预期结果
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 经过清理的错误信息或截图
+      description: 请隐藏个人路径和账号信息，不上传完整作品。

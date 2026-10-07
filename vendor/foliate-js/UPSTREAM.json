@@ -1,0 +1,15 @@
+{
+  "repository": "https://github.com/johnfactotum/foliate-js",
+  "commit": "78914aef4466eb960965702401634c2cb348e9b1",
+  "license": "MIT",
+  "integration": "SourceProvider loader, application book interface, separate PDF.js",
+  "changes": [
+    "view.js: remove automatic file/URL loaders and unused format imports; application supplies parsed books through ReaderEngine",
+    "view.js: remove unused search, TTS and annotation APIs and their four modules; application bookmarks use CFI navigation directly",
+    "paginator.js and fixed-layout.js: remove allow-scripts from iframe sandbox for Windows WebView2",
+    "paginator.js: force-spread attribute honors an explicit two-page choice in portrait windows",
+    "paginator.js: continuous wheel/drag navigation crosses chapter boundaries and retains a numeric anchor for image-only pages",
+    "paginator.js: keep viewport dimensions for image sizing in continuous flow; remove the inline SVG baseline gap in image-only sections",
+    "paginator.js: release the navigation lock in finally and guard missing adjacent sections at both book ends"
+  ]
+}

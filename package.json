@@ -1,0 +1,51 @@
+{
+  "name": "animeread",
+  "version": "0.9.5",
+  "private": true,
+  "type": "module",
+  "description": "Windows 小说与漫画阅读器",
+  "license": "MIT",
+  "packageManager": "pnpm@11.19.0",
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "dev": "node scripts/copy-pdf-assets.mjs && vite --host 127.0.0.1",
+    "build": "node scripts/copy-pdf-assets.mjs && tsc --noEmit && vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "tauri": "node scripts/tauri.mjs",
+    "version:next": "node scripts/bump-version.mjs",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "licenses:collect": "node scripts/collect-licenses.mjs",
+    "check": "tsc --noEmit",
+    "audit:code": "knip",
+    "format": "prettier --write src tests scripts *.config.ts",
+    "format:check": "prettier --check src tests scripts *.config.ts"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.0.0",
+    "@zip.js/zip.js": "^2.7.0",
+    "anime4k-webgpu": "1.0.0",
+    "lucide-react": "^0.577.0",
+    "pdfjs-dist": "^5.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.0",
+    "@tauri-apps/cli": "^2.0.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "@webgpu/types": "0.1.69",
+    "knip": "5.80.0",
+    "pdf-lib": "^1.17.1",
+    "prettier": "3.9.9",
+    "typescript": "^5.9.0",
+    "vite": "^7.0.0",
+    "vitest": "^3.2.0",
+    "page-flip": "2.0.7"
+  }
+}
