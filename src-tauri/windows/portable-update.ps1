@@ -1,9 +1,17 @@
-# 仅由签名验证后的便携更新调用：先等旧进程退出，再替换白名单文件。
+﻿# 仅由签名验证后的便携更新调用：先等旧进程退出，再替换白名单文件。
 # 所有读写、回滚和清理仍在本脚本中完成，不跨 shell 拼接删除命令。
 $ErrorActionPreference = 'Stop'
-$readerStage = [IO.Path]::GetFullPath($PSScriptRoot)
+function Resolve-ReaderShellPath([string]$Path) {
+  # Rust canonicalize 会返回 Windows 的扩展路径；PowerShell 5.1 的 Join-Path
+  # 无法识别其驱动器。只转换前缀，不改变实际目录，保留 UNC 网络路径。
+  if ($Path.StartsWith('\\?\UNC\', [StringComparison]::OrdinalIgnoreCase)) { $Path = '\\' + $Path.Substring(8) }
+  elseif ($Path.StartsWith('\\?\', [StringComparison]::OrdinalIgnoreCase)) { $Path = $Path.Substring(4) }
+  return [IO.Path]::GetFullPath($Path)
+}
+$readerStage = Resolve-ReaderShellPath $PSScriptRoot
 $readerRequest = Get-Content -LiteralPath (Join-Path $readerStage 'request.json') -Raw -Encoding UTF8 | ConvertFrom-Json
-$readerRoot = [IO.Path]::GetFullPath($readerRequest.root)
+$readerRequest.stage = Resolve-ReaderShellPath $readerRequest.stage
+$readerRoot = Resolve-ReaderShellPath $readerRequest.root
 function Resolve-ReaderTarget([string]$Base, [string]$Relative) {
   $readerTarget = [IO.Path]::GetFullPath((Join-Path $Base $Relative))
   if (-not $readerTarget.StartsWith($Base.TrimEnd('\') + '\', [StringComparison]::OrdinalIgnoreCase)) { throw '更新路径越界' }

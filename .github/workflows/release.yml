@@ -44,6 +44,8 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           pnpm test
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          powershell -NoProfile -ExecutionPolicy Bypass -File tests/portable-update.ps1
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
           node scripts/cargo.mjs fmt --manifest-path src-tauri/Cargo.toml --check
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
           node scripts/cargo.mjs clippy --release --manifest-path src-tauri/Cargo.toml --locked -- -D warnings

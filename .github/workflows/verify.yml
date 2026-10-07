@@ -38,6 +38,8 @@ jobs:
         run: pnpm audit:code
       - name: Test core logic
         run: pnpm test
+      - name: Test portable update paths and rollback
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File tests/portable-update.ps1
       - name: Build frontend
         run: pnpm build
       - name: Install test browser

@@ -169,6 +169,7 @@ vendor 保存经过必要修补、固定版本的源码。直接删除会使小�
 | tests/e2e/novel-update.spec.ts | 用户小说、初次全屏、共用鼠标拖动、首页、自动分组与视频壁纸 |
 | tests/e2e/stress.spec.ts | 损坏恢复、快速输入、定位与千卷书架 |
 | tests/curl-motion.mjs | 检查卷页的实际逐帧运动和纸张宽度 |
+| tests/portable-update.ps1 | Windows 更新助手的普通／扩展路径、回滚和数据保护 |
 | docs/USER_GUIDE.md | 快捷键、功能、引擎和滤镜说明；应用直接读取 |
 | docs/ARCHITECTURE.md | 模块职责、数据生命周期和资源上限 |
 | docs/BUILD.md | 安装编译工具、缓存、导出与版本流程 |
