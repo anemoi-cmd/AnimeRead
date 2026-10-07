@@ -405,6 +405,9 @@ export class NovelReader implements ReaderEngine {
     const cfi = this.view?.lastLocation?.cfi;
     return cfi ? collapse(cfi) : undefined;
   }
+  async resize() {
+    await this.setStyle(this.style);
+  }
   private layoutChanged() {
     return (
       this.host?.clientWidth !== this.layoutWidth ||

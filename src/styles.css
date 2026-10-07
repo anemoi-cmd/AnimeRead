@@ -860,6 +860,8 @@ button svg {
 }
 .fixed-surface {
   overflow: auto;
+  /* 更换纸张时由阅读器决定滚动位置，防止浏览器沿旧图自动锚定。 */
+  overflow-anchor: none;
   padding: 0;
   text-align: center;
   position: relative;

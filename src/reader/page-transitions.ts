@@ -37,8 +37,15 @@ export async function turnPageSurface(
   restore: () => Promise<void>,
   gesture?: TurnGesture,
 ) {
-  if (gesture?.committed === false) return;
+  // 拖动状态会在异步图片解码期间改变，每次读取当前值。
+  const cancelled = () => gesture?.committed === false;
+  if (cancelled()) return;
   const cover = document.createElement("div");
+  const viewport = () => {
+    const { width, height } = host.getBoundingClientRect();
+    return `${width}:${height}:${window.devicePixelRatio}`;
+  };
+  const initialViewport = viewport();
   // 动画消失后，取消拖动仍可能正在恢复原页。繁忙状态覆盖整个事务，
   // 让辅助工具与调用者只在页面和阅读锚点都稳定后继续操作。
   host.setAttribute("aria-busy", "true");
@@ -58,6 +65,22 @@ export async function turnPageSurface(
     }
     await advance();
     const after = before ? await capture() : undefined;
+    // 原生最大化／还原和显示器 DPI 变化可能发生在解码新页期间。
+    // 两张快照不属于同一视口时直接显示已准备好的目标页，不把旧框
+    // 拉伸成动画后再跳回新框；取消的拖动仍恢复原阅读位置。
+    if (
+      initialViewport !== viewport() ||
+      (before &&
+        after &&
+        (before.spread !== after.spread ||
+          (["width", "height", "left", "top"] as const).some(
+            (key) => Math.abs(before[key] - after[key]) > 1 / 64,
+          )))
+    ) {
+      if (cancelled()) await restore();
+      else gesture?.finish(true);
+      return;
+    }
     if (style.motion === "curl") {
       const committed = await curlPage(
         host,

@@ -1,6 +1,6 @@
 {
   "name": "animeread",
-  "version": "0.9.5",
+  "version": "0.9.6",
   "private": true,
   "type": "module",
   "description": "Windows 小说与漫画阅读器",

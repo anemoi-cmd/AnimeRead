@@ -129,7 +129,8 @@ export function bindReadingInput(
       : "next";
   const keydown = (event: Event) => {
     const key = event as KeyboardEvent;
-    if (key.key === "Escape") pointerStart?.gesture?.finish(false);
+    if (key.key === "Escape" || key.key === "F11")
+      pointerStart?.gesture?.finish(false);
     const parentShortcut =
       key.key === "Escape" ||
       key.key === "F11" ||
@@ -312,7 +313,10 @@ export function bindReadingInput(
       surface.ownerDocument.defaultView?.removeEventListener("blur", cancel);
   };
   const cancel = (event?: Event) => {
-    if (event?.type === "keydown" && (event as KeyboardEvent).key !== "Escape")
+    if (
+      event?.type === "keydown" &&
+      !["Escape", "F11"].includes((event as KeyboardEvent).key)
+    )
       return;
     pointerStart?.gesture?.finish(false);
     pointerStart = undefined;

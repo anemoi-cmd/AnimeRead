@@ -129,6 +129,7 @@ export default function App() {
   const [immersive, setImmersive] = useState(false);
   const immersiveRef = useRef(false);
   immersiveRef.current = immersive;
+  const fullscreenPending = useRef(false);
   const [contextBook, setContextBook] = useState<{
     book: ShelfBook;
     x: number;
@@ -306,6 +307,7 @@ export default function App() {
   const move = useCallback(
     (action: NavigationAction, gesture?: TurnGesture) => {
       if (
+        fullscreenPending.current ||
         !run((reader) =>
           action === "next" ? reader.next(gesture) : reader.previous(gesture),
         )
@@ -332,21 +334,33 @@ export default function App() {
   }, []);
   const fullscreen = useCallback(
     async (value: boolean) => {
-      setSettings(false);
-      setTocOpen(false);
-      setBookmarksOpen(false);
-      setImmersive(value);
+      if (fullscreenPending.current) return;
+      fullscreenPending.current = true;
       try {
+        // 先结束当前翻页，再改变窗口。原生窗口与 React 布局不是同时
+        // 更新的；切换期间暂停新翻页，避免把两个视口的快照混在一起。
+        await queue.current;
+        setSettings(false);
+        setTocOpen(false);
+        setBookmarksOpen(false);
+        setImmersive(value);
         if (native) await getCurrentWindow().setFullscreen(value);
         else if (value) await document.documentElement.requestFullscreen();
         else if (document.fullscreenElement) await document.exitFullscreen();
+        await new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+        );
+        run((reader) => reader.resize(), true);
+        await queue.current;
         surface.current?.focus({ preventScroll: true });
       } catch (error) {
         setImmersive(false);
         fail(error);
+      } finally {
+        fullscreenPending.current = false;
       }
     },
-    [fail],
+    [fail, run],
   );
   const open = useCallback(
     async (book: ShelfBook) => {
@@ -465,7 +479,7 @@ export default function App() {
               styleRef.current,
               update,
               move,
-              () => enabled.current,
+              () => enabled.current && !fullscreenPending.current,
               fail,
             );
             if (sequence !== opening.current) {

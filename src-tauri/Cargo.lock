@@ -43,7 +43,7 @@ dependencies = [
 
 [[package]]
 name = "animeread"
-version = "0.9.5"
+version = "0.9.6"
 dependencies = [
  "fontdb",
  "image",

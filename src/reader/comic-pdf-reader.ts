@@ -99,6 +99,8 @@ export class ComicPdfReader implements ReaderEngine {
   private prefetchTimer?: ReturnType<typeof setTimeout>;
   private turning = false;
   private resizePending = false;
+  private resizeQueue = Promise.resolve();
+  private layoutViewport?: ReturnType<ComicPdfReader["viewport"]>;
   private async makeFrame(image: HTMLImageElement, index: number) {
     image.dataset.page = String(index);
     const frame = new ImageFrame(image);
@@ -211,6 +213,7 @@ export class ComicPdfReader implements ReaderEngine {
       this.images = new ImagePages(this.source, this.names, this.archive);
     await this.render();
     this.observer = new ResizeObserver(() => {
+      if (!this.layoutChanged()) return;
       clearTimeout(this.timer);
       this.timer = setTimeout(() => {
         if (!this.disposed) void this.resize().catch(this.fail);
@@ -470,6 +473,19 @@ export class ComicPdfReader implements ReaderEngine {
   private systemScale() {
     return Math.max(0.5, window.devicePixelRatio || 1);
   }
+  private viewport() {
+    const { width, height } = this.host!.getBoundingClientRect();
+    return { width, height, pixelRatio: this.systemScale() };
+  }
+  private layoutChanged() {
+    if (!this.host) return false;
+    const viewport = this.viewport();
+    return (
+      viewport.width !== this.layoutViewport?.width ||
+      viewport.height !== this.layoutViewport?.height ||
+      viewport.pixelRatio !== this.layoutViewport?.pixelRatio
+    );
+  }
   private stripWidth() {
     return Math.max(
       100,
@@ -480,11 +496,14 @@ export class ComicPdfReader implements ReaderEngine {
    * 每一页在固定框内等比适配，允许留白；无需扫描整本最大图片，
    * 也不拉伸人物和文字。静态页、遮罩与卷页始终共用这一套尺寸。
    */
-  private pageFrame() {
-    const scale = this.style.zoom / this.systemScale();
+  private pageFrame(viewport = this.viewport()) {
+    const scale = this.style.zoom / viewport.pixelRatio;
+    // clientWidth/Height 会取整，并随旧页产生的滚动条改变。退出全屏时
+    // 旧页过大，若据此缩小新页，滚动条消失后页面又会放大一次。固定框
+    // 使用容器实际的小数尺寸，不把滚动条当成一次新的窗口缩放。
     return {
-      width: Math.max(1, this.host!.clientWidth * scale),
-      height: Math.max(1, this.host!.clientHeight * scale),
+      width: Math.max(1, viewport.width * scale),
+      height: Math.max(1, viewport.height * scale),
     };
   }
   private createSpread(className: string, indexes: number[]) {
@@ -512,12 +531,13 @@ export class ComicPdfReader implements ReaderEngine {
   }
   private layoutSpread(spread = this.spread) {
     if (!this.host || !spread) return;
-    const frame = this.pageFrame();
+    const viewport = this.viewport();
+    const frame = this.pageFrame(viewport);
     const columns = this.isDouble() ? 2 : 1;
     spread.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
     spread.style.width = `${frame.width}px`;
     spread.style.height = `${frame.height}px`;
-    spread.style.marginTop = `${Math.max(0, (this.host.clientHeight - frame.height) / 2)}px`;
+    spread.style.marginTop = `${Math.max(0, (viewport.height - frame.height) / 2)}px`;
     spread.style.background = THEME_COLORS[this.style.theme].background;
     const images = [...spread.querySelectorAll<HTMLElement>(".image-frame")];
     for (const image of images) {
@@ -530,19 +550,38 @@ export class ComicPdfReader implements ReaderEngine {
       image.style.width = `${width * scale}px`;
       image.style.height = `${height * scale}px`;
     }
+    this.layoutViewport = viewport;
   }
-  private async resize() {
+  async resize() {
     if (this.turning) {
       this.resizePending = true;
       return;
     }
-    if (this.vertical) await this.vertical.resize(this.stripWidth());
-    else if (this.pdf) await this.render();
-    else {
-      this.layoutSpread();
-    }
+    // PDF 重绘是异步的，窗口连续改变时串行处理，避免迟到的重绘覆盖
+    // 点击翻出的目标页。漫画只调整固定框，不重新解码或调用超分。
+    this.resizeQueue = this.resizeQueue
+      .catch(() => {})
+      .then(async () => {
+        if (this.disposed || !this.host) return;
+        if (this.turning) {
+          this.resizePending = true;
+          return;
+        }
+        if (this.vertical) {
+          await this.vertical.resize(this.stripWidth());
+          this.layoutViewport = this.viewport();
+        } else if (this.pdf) await this.render();
+        else this.layoutSpread();
+      });
+    await this.resizeQueue;
   }
   private async turn(delta: number, gesture?: TurnGesture) {
+    await this.resizeQueue;
+    if (!this.host || this.disposed) return;
+    // 鼠标点击可能早于 ResizeObserver 的延迟回调；必须先更新静态页，
+    // 再捕获旧页。否则旧动画框与按新窗口渲染的目标页尺寸不同。
+    clearTimeout(this.timer);
+    if (this.layoutChanged()) await this.resize();
     const next = turnPage(this.page, this.pages, this.isDouble(), delta);
     if (this.vertical) {
       await this.vertical.goTo(next);

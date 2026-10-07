@@ -95,6 +95,8 @@ export interface ReaderEngine {
   goTo(target: string | number): Promise<void>;
   goToProgress(progress: number): Promise<void>;
   setStyle(style: ReaderStyle): Promise<void>;
+  /** 窗口／面板尺寸改变后重新布局，保留当前阅读位置。 */
+  resize(): Promise<void>;
   cancelPending?(): Promise<void>;
   dispose(): Promise<void>;
 }

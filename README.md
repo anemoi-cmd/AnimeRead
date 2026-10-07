@@ -1,6 +1,6 @@
 # AnimeRead
 
-Windows 小说与漫画阅读器，当前版本 **0.9.5**。基于 Tauri 2、Rust、React、TypeScript 和 WebView2。
+Windows 小说与漫画阅读器，当前版本 **0.9.6**。基于 Tauri 2、Rust、React、TypeScript 和 WebView2。
 
 ## 运行与功能
 
