@@ -556,18 +556,27 @@ try {
     await page.getByLabel("阅读顺序").selectOption("rtl");
     await page.getByLabel("关闭阅读设置").click();
     await expect(page.locator(".comic-page")).toHaveCount(2);
-    const bounds = await page.locator(".comic-page").evaluateAll((images) =>
-      images
-        .map((image) => ({
-          page: image.dataset.page,
-          x: image.getBoundingClientRect().x,
-          ratio:
-            image.getBoundingClientRect().width /
-            image.getBoundingClientRect().height,
-          source: image.naturalWidth / image.naturalHeight,
-        }))
-        .sort((a, b) => Number(a.page) - Number(b.page)),
-    );
+    const pageBounds = () =>
+      page.locator(".comic-page").evaluateAll((images) =>
+        images
+          .map((image) => ({
+            page: image.dataset.page,
+            x: image.getBoundingClientRect().x,
+            ratio:
+              image.getBoundingClientRect().width /
+              image.getBoundingClientRect().height,
+            source: image.naturalWidth / image.naturalHeight,
+          }))
+          .sort((a, b) => Number(a.page) - Number(b.page)),
+      );
+    // 布局与方向各自异步应用；按源页的实际位置等待最终布局。
+    await expect
+      .poll(async () => {
+        const bounds = await pageBounds();
+        return bounds.length === 2 && bounds[0].x > bounds[1].x;
+      })
+      .toBe(true);
+    const bounds = await pageBounds();
     expect(bounds[0].x).toBeGreaterThan(bounds[1].x);
     for (const bound of bounds)
       expect(bound.ratio).toBeCloseTo(bound.source, 2);
