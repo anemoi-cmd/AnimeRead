@@ -1,7 +1,7 @@
 /** 生成签名与更新清单，两个渠道使用同一把发行密钥。私钥从项目外读取，
  * 永不写入源码包、便携包或清单。CI 可通过环境变量提供自己的密钥。
  */
-import { readFile, writeFile, access } from "node:fs/promises";
+import { readFile, writeFile, stat } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { resolve, join } from "node:path";
 import { workspaceDirectory } from "./tool-paths.mjs";
@@ -9,12 +9,17 @@ import { workspaceDirectory } from "./tool-paths.mjs";
 const pkg = JSON.parse(
   await readFile(resolve(workspaceDirectory, "package.json"), "utf8"),
 );
-const key =
+const configuredKey =
   process.env.TAURI_SIGNING_PRIVATE_KEY ||
   (process.env.LOCALAPPDATA &&
     join(process.env.LOCALAPPDATA, "AnimeRead/release-signing/update.key"));
-if (!key) throw new Error("Set TAURI_SIGNING_PRIVATE_KEY to sign a release");
-if (!process.env.TAURI_SIGNING_PRIVATE_KEY) await access(key);
+if (!configuredKey)
+  throw new Error("Set TAURI_SIGNING_PRIVATE_KEY to sign a release");
+// build 支持密钥路径，但 signer sign 的 KEY 环境变量只接受密钥内容。
+// 两种输入统一在内存中读取，避免把私钥放进命令行参数或日志。
+const key = (await stat(configuredKey).catch(() => null))?.isFile()
+  ? await readFile(configuredKey, "utf8")
+  : configuredKey;
 const env = {
   ...process.env,
   TAURI_SIGNING_PRIVATE_KEY: key,
@@ -34,6 +39,8 @@ for (const [target, suffix] of [
       resolve(workspaceDirectory, "node_modules/@tauri-apps/cli/tauri.js"),
       "signer",
       "sign",
+      "--app-version",
+      pkg.version,
       path,
     ],
     { cwd: workspaceDirectory, env, encoding: "utf8", windowsHide: true },
