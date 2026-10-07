@@ -1257,7 +1257,9 @@ export default function App() {
           close={() => setUpdatesOpen(false)}
           prepare={async () => {
             await back();
-            saveMemory(memoryRef.current);
+            // 阅读样式独立于书目状态；更新退出前必须保存最新样式，
+            // 避免用 memory 中较早的 style 覆盖用户刚修改的主题或速度。
+            saveMemory({ ...memoryRef.current, style: styleRef.current });
           }}
         />
       )}
