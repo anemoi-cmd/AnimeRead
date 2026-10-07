@@ -2,6 +2,7 @@
 *.ts text eol=lf
 *.tsx text eol=lf
 *.mjs text eol=lf
+*.mts text eol=lf
 *.rs text eol=lf
 *.toml text eol=lf
 *.lock text eol=lf

@@ -556,22 +556,17 @@ try {
     await page.getByLabel("阅读顺序").selectOption("rtl");
     await page.getByLabel("关闭阅读设置").click();
     await expect(page.locator(".comic-page")).toHaveCount(2);
-    await expect
-      .poll(() =>
-        page
-          .locator(".comic-spread")
-          .evaluate((spread) => getComputedStyle(spread).flexDirection),
-      )
-      .toBe("row-reverse");
     const bounds = await page.locator(".comic-page").evaluateAll((images) =>
-      images.map((image) => ({
-        page: image.dataset.page,
-        x: image.getBoundingClientRect().x,
-        ratio:
-          image.getBoundingClientRect().width /
-          image.getBoundingClientRect().height,
-        source: image.naturalWidth / image.naturalHeight,
-      })),
+      images
+        .map((image) => ({
+          page: image.dataset.page,
+          x: image.getBoundingClientRect().x,
+          ratio:
+            image.getBoundingClientRect().width /
+            image.getBoundingClientRect().height,
+          source: image.naturalWidth / image.naturalHeight,
+        }))
+        .sort((a, b) => Number(a.page) - Number(b.page)),
     );
     expect(bounds[0].x).toBeGreaterThan(bounds[1].x);
     for (const bound of bounds)
@@ -656,6 +651,9 @@ try {
         await page.getByLabel("阅读进度").fill("296");
         await expect(location).toHaveText("51 / 170");
         await page.getByLabel("阅读设置", { exact: true }).click();
+        await page.getByLabel("单双页").selectOption("single");
+        await page.getByLabel("阅读顺序").selectOption("ltr");
+        await page.getByLabel("翻页方式").selectOption("instant");
         await page.getByLabel("增强引擎").selectOption(backend);
         await page.getByLabel("滤镜预设").selectOption("A+A");
         await page.getByLabel("超分画质").check();
