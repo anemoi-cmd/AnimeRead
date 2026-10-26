@@ -980,6 +980,8 @@ export default function App() {
               ? `url("${backgroundUrl}")`
               : "none",
           "--wallpaper-opacity": appearance.backgroundOpacity,
+          "--reader-background": colors.background,
+          "--reader-foreground": colors.foreground,
         } as CSSProperties
       }
       onContextMenu={(event) => event.preventDefault()}

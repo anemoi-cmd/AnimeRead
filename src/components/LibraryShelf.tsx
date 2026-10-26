@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import {
   BookOpen,
   Plus,
@@ -121,9 +121,25 @@ export function LibraryShelf({
     ? (memory.books[recent.id]?.title ?? recent.name.replace(/\.[^.]+$/, ""))
     : "";
   const lastRead = recent && memory.books[recent.id]?.lastRead;
+  const recentProgress = recent && memory.books[recent.id]?.location?.progress;
+  const recentCover = recent && covers[recent.id];
+  // 还没有阅读记录时，首页右侧展示书架前几本的封面。
+  const fan = recent
+    ? []
+    : coverBooks
+        .map((book) => covers[book.id])
+        .filter(Boolean)
+        .slice(0, 3);
   return (
     <div className="library-content">
       <section className="welcome">
+        {recentCover && (
+          <div
+            className="welcome-backdrop"
+            aria-hidden="true"
+            style={{ backgroundImage: `url("${recentCover}")` }}
+          />
+        )}
         <div>
           <h1>{appearance.welcomeTitle || DEFAULT_APPEARANCE.welcomeTitle}</h1>
           <p>
@@ -148,6 +164,20 @@ export function LibraryShelf({
             </button>
           </div>
         </div>
+        {fan.length > 0 && (
+          <div className="cover-fan" aria-hidden="true">
+            {fan.map((url, index) => (
+              <img
+                key={url}
+                src={url}
+                alt=""
+                style={
+                  { "--fan": index - (fan.length - 1) / 2 } as CSSProperties
+                }
+              />
+            ))}
+          </div>
+        )}
         {recent && (
           <button
             className="recent-book"
@@ -165,6 +195,14 @@ export function LibraryShelf({
             <div>
               <span>上次阅读</span>
               <strong>{recentTitle}</strong>
+              {recentProgress !== undefined && (
+                <span className="recent-progress">
+                  <i>
+                    <b style={{ width: `${recentProgress * 100}%` }} />
+                  </i>
+                  {Math.round(recentProgress * 100)}%
+                </span>
+              )}
               {lastRead && (
                 <time dateTime={new Date(lastRead).toISOString()}>
                   {new Date(lastRead).toLocaleString("zh-CN", {
