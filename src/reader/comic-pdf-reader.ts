@@ -149,6 +149,7 @@ export class ComicPdfReader implements ReaderEngine {
   async open(host: HTMLElement, saved?: ReaderLocation) {
     applyPaperTheme(host, this.style.theme);
     this.host = host;
+    host.classList.add("fixed-surface");
     this.unbind = bindReadingInput(
       host,
       this.move,
@@ -209,8 +210,12 @@ export class ComicPdfReader implements ReaderEngine {
           ? saved.section
           : 0;
     this.page = Math.min(this.pages - 1, Math.max(0, restored));
-    if (!this.pdf)
-      this.images = new ImagePages(this.source, this.names, this.archive);
+    if (!this.pdf) {
+      this.images = new ImagePages(this.source, this.names, this.archive, () =>
+        this.enhanceTarget(),
+      );
+      this.images.warm(this.style);
+    }
     await this.render();
     this.observer = new ResizeObserver(() => {
       if (!this.layoutChanged()) return;
@@ -326,15 +331,12 @@ export class ComicPdfReader implements ReaderEngine {
           this.host,
           this.pages,
           async (index) => {
-            const loaded = await this.images!.load(index, {
-              ...this.style,
-              enhanceEnabled: false,
-            });
+            const image = await this.images!.loadOriginal(index);
             // Populate attaches the node in its own microtask before enhancement starts.
             setTimeout(() => {
               if (index === this.page) this.enhanceVisible();
             }, 0);
-            return this.makeFrame(loaded.image, index);
+            return this.makeFrame(image, index);
           },
           (index) => {
             if (this.page !== index) {
@@ -372,13 +374,9 @@ export class ComicPdfReader implements ReaderEngine {
     } else {
       const pages = spreadPages(this.page, this.pages, this.isDouble());
       const loaded = await Promise.all(
-        pages.map(async (index) => {
-          const value = await this.images!.load(index, {
-            ...this.style,
-            enhanceEnabled: false,
-          });
-          return this.makeFrame(value.image, index);
-        }),
+        pages.map(async (index) =>
+          this.makeFrame(await this.images!.loadOriginal(index), index),
+        ),
       );
       if (this.disposed || generation !== this.generation) return;
       const { spread, slots } = this.createSpread("comic-spread", pages);
@@ -469,6 +467,19 @@ export class ComicPdfReader implements ReaderEngine {
           this.schedulePrefetch();
         }
       });
+  }
+  /** 超分输出上限：页面在本屏幕上全屏显示时占用的设备像素。固定框 CSS
+   * 尺寸为“视口 × 缩放 ÷ 像素比”，换成设备像素即“视口 × 缩放”；双页各占
+   * 一半，上下阅读只限宽度。按屏幕而不是当前窗口计算，切换全屏不必重算。
+   */
+  private enhanceTarget() {
+    const width = screen.width * this.style.zoom;
+    if (this.style.direction === "ttb")
+      return { width, height: Number.POSITIVE_INFINITY };
+    return {
+      width: width / (this.isDouble() ? 2 : 1),
+      height: screen.height * this.style.zoom,
+    };
   }
   private systemScale() {
     return Math.max(0.5, window.devicePixelRatio || 1);
@@ -665,6 +676,7 @@ export class ComicPdfReader implements ReaderEngine {
       pipelineChanged
     ) {
       await this.cancelPending();
+      if (pipelineChanged) this.images?.warm(style);
       this.vertical?.dispose();
       this.vertical = undefined;
       this.enhancingPage = undefined;
@@ -686,6 +698,7 @@ export class ComicPdfReader implements ReaderEngine {
     await this.pdfTask?.destroy();
     await this.archive?.close();
     await this.source.close();
+    this.host?.classList.remove("fixed-surface");
     this.host?.replaceChildren();
   }
 }

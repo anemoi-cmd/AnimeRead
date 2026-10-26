@@ -29,3 +29,15 @@ docs/USER_REQUIREMENTS.md
 .env
 .env.*
 !.env.example
+# 语音素材、训练环境与权重放在工程外，不进入源码历史。
+/voice-workspace/
+/datasets/
+/models/
+/voices/
+/.venv/
+/venv/
+*.ckpt
+*.pth
+*.pt
+*.safetensors
+*.onnx

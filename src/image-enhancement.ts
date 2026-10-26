@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ReaderStyle } from "./reader-types";
 import { native } from "./file-sources";
 import { anime4kImage } from "./gpu/anime4k-client";
+import { enhancedSize, type EnhanceTarget } from "./gpu/output-size";
 /// <reference types="@webgpu/types" />
 export interface EnhancementRuntime {
   available: boolean;
@@ -37,16 +38,20 @@ export async function anime4kDevice() {
   })().catch(() => undefined);
   return animeDevice;
 }
+// Waifu2x 命令行可直接读取的格式；其他格式先转成 PNG。
+const WAIFU2X_INPUT = new Set(["image/png", "image/jpeg", "image/webp"]);
+/** 输出为 ImageBitmap：不经过 PNG 编码／再解码，尺寸由 enhancedSize 决定。 */
 export async function enhanceImage(
-  image: HTMLImageElement,
+  original: Blob,
   style: ReaderStyle,
+  target: EnhanceTarget | undefined,
   signal?: AbortSignal,
-) {
+): Promise<{ bitmap: ImageBitmap; scale: number; device: string }> {
   signal?.throwIfAborted();
   if (style.enhanceBackend === "anime4k") {
     if (await anime4kDevice()) {
       try {
-        return await anime4kImage(image, style.filters, signal);
+        return await anime4kImage(original, style.filters, target, signal);
       } catch (error) {
         signal?.throwIfAborted();
         if ((error as Error)?.name === "AbortError" || !native) throw error;
@@ -65,29 +70,46 @@ export async function enhanceImage(
     runtime.gpuId < 0
   )
     throw new Error("未检测到可用显卡，超分已停止，保留原图");
-  const canvas = document.createElement("canvas");
-  canvas.width = image.naturalWidth;
-  canvas.height = image.naturalHeight;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("无法准备漫画页面");
-  context.drawImage(image, 0, 0);
-  const blob = await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error("页面转换失败"))),
-      "image/png",
-    ),
-  );
+  let input = original;
+  if (!WAIFU2X_INPUT.has(original.type)) {
+    const decoded = await createImageBitmap(original);
+    const canvas = new OffscreenCanvas(decoded.width, decoded.height);
+    canvas.getContext("2d")!.drawImage(decoded, 0, 0);
+    decoded.close();
+    input = await canvas.convertToBlob({ type: "image/png" });
+  }
   signal?.throwIfAborted();
-  if (blob.size > 16 * 1024 * 1024) throw new Error("增强输入最多 16 MiB");
+  if (input.size > 16 * 1024 * 1024) throw new Error("增强输入最多 16 MiB");
   const bytes = await invoke<ArrayBuffer>(
     "enhance_image",
-    await blob.arrayBuffer(),
+    await input.arrayBuffer(),
     { headers: { "x-animeread-filters": JSON.stringify(style.filters) } },
   );
   signal?.throwIfAborted();
-  return {
-    blob: new Blob([bytes], { type: "image/png" }),
-    scale: 2 ** style.filters.filter((mode) => mode === "A").length,
-    device: runtime.device,
-  };
+  const scale = 2 ** style.filters.filter((mode) => mode === "A").length;
+  const full = await createImageBitmap(
+    new Blob([bytes], { type: "image/png" }),
+  );
+  const size = enhancedSize(
+    full.width / scale,
+    full.height / scale,
+    scale,
+    target,
+  );
+  if (size.width === full.width && size.height === full.height)
+    return { bitmap: full, scale, device: runtime.device };
+  try {
+    const bitmap = await createImageBitmap(full, {
+      resizeWidth: size.width,
+      resizeHeight: size.height,
+      resizeQuality: "high",
+    });
+    return {
+      bitmap,
+      scale: (size.width * scale) / full.width,
+      device: runtime.device,
+    };
+  } finally {
+    full.close();
+  }
 }

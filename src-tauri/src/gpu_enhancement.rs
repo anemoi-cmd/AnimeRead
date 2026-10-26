@@ -314,7 +314,15 @@ pub async fn enhance_image(
             .filter(|id| *id >= 0)
             .ok_or("未检测到可用显卡，超分已停止，保留原图")?;
         let directory = runtime_directory().ok_or("增强扩展不存在")?;
-        let decoder = image::ImageReader::with_format(Cursor::new(&bytes), ImageFormat::Png);
+        // 漫画原文件多为 JPEG；直接交给 Waifu2x，免去前端 PNG 重新编码。
+        let format = image::guess_format(&bytes).map_err(|e| e.to_string())?;
+        let extension = match format {
+            ImageFormat::Png => "png",
+            ImageFormat::Jpeg => "jpg",
+            ImageFormat::WebP => "webp",
+            _ => return Err("增强输入只支持 PNG、JPEG 或 WebP".into()),
+        };
+        let decoder = image::ImageReader::with_format(Cursor::new(&bytes), format);
         let (mut width, mut height) = decoder.into_dimensions().map_err(|e| e.to_string())?;
         let scale = 2u64.pow(
             options
@@ -338,7 +346,7 @@ pub async fn enhance_image(
         fs::create_dir_all(&parent).map_err(|e| e.to_string())?;
         let job = TemporaryJob(parent.join(uuid::Uuid::new_v4().to_string()));
         fs::create_dir(&job.0).map_err(|e| e.to_string())?;
-        let mut input = job.0.join("input.png");
+        let mut input = job.0.join(format!("input.{extension}"));
         fs::write(&input, bytes).map_err(|e| e.to_string())?;
         for (index, mode) in options.filters.iter().enumerate() {
             if state.generation.load(Ordering::SeqCst) != generation {
@@ -369,6 +377,8 @@ pub async fn enhance_image(
             }
             // 单次 GPU 任务只有一个真实显卡设备；失败立即返回原图，不再
             // 偷偷转入不可用的 CPU 模型。进程等待仍受取消和超时约束。
+            // 分块大小交给 ncnn 按显存自动选择（独显通常 400），固定 128
+            // 会让大显存显卡做大量小块调度，速度只有自动值的几分之一。
             let log = job.0.join(format!("step-{index}.log"));
             let child = command(&directory)
                 .arg("-i")
@@ -381,11 +391,11 @@ pub async fn enhance_image(
                     "-n",
                     &noise.to_string(),
                     "-t",
-                    "128",
+                    "0",
                     "-g",
                     &gpu_id.to_string(),
                     "-j",
-                    "1:1:1",
+                    "1:2:2",
                 ])
                 .arg("-m")
                 .arg(directory.join("models-cunet"))

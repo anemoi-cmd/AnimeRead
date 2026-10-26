@@ -32,7 +32,7 @@
 | .github/workflows/verify.yml | GitHub 自动验证通用界面、类型和 Rust |
 | .github/workflows/release.yml | 检查、构建、签名并完整发布新版 |
 | docs/RELEASE.md | 签名密钥、发布渠道与更新维护流程 |
-| docs/VOICE_TRAINING.md | 下一阶段声音训练教程和按需模型分发设计 |
+| docs/VOICE_TRAINING.md | 0.9.7 朗读方案、跨语言试听、素材标准、按需分发与阶段验收 |
 | .github/ISSUE_TEMPLATE/bug.yml | 问题报告表单 |
 
 ## 界面与阅读源码
@@ -45,7 +45,7 @@
 | App.tsx | 应用状态、快捷键、打开／关闭／导航队列 |
 | reader-types.ts | 书籍、样式、位置、来源和阅读引擎类型 |
 | file-sources.ts | Tauri 与浏览器验证环境的文件来源适配 |
-| reading-storage.ts | 设置、进度、书签和数据迁移／恢复 |
+| reading-storage.ts | 有效设置白名单、进度、书签和数据迁移／恢复，丢弃旧接口字段 |
 | appearance-settings.ts | 软件配色与背景设置定义 |
 | book-groups.ts | 分组成员、卷序、书目合并、同名系列匹配与手工排除 |
 | reading-time.ts | 阅读计时与时间显示 |
@@ -69,7 +69,8 @@
 | ambience/rain-field.ts | 有界雨丝、水滴、滑落与尾迹 |
 | ambience/reading-sounds.ts | 雨声与翻书录音共用解码缓存和 AudioContext，雨声交叉淡入淡出 |
 | gpu/anime4k-client.ts | 管理增强 Worker、任务与取消 |
-| gpu/anime4k.worker.ts | GPU 设备／管线复用、分块推理、编码 |
+| gpu/anime4k.worker.ts | GPU 设备／管线复用与预编译、显卡内分块推理、拼接与缩放 |
+| gpu/output-size.ts | 按屏幕需要计算超分输出尺寸 |
 | gpu/screentone-protection.ts | 识别并保留密集网点，减少 CNN 叠加产生的斑纹 |
 | reader/create-reader.ts | 按真实格式选择阅读引擎 |
 | reader/book-archive.ts | ZIP 随机读取、解压和路径边界 |
@@ -77,7 +78,7 @@
 | reader/text-chapters.ts | TXT 编码、章节与安全 HTML |
 | reader/novel-reader.ts | TXT／文字 EPUB 的单双栏与 CFI 定位 |
 | reader/comic-pdf-reader.ts | 漫画／PDF 固定页面框、等比适配、单双页槽、缩放与增强预缓存 |
-| reader/image-page-cache.ts | 原图／增强压缩缓存、加载与取消 |
+| reader/image-page-cache.ts | 原图压缩缓存、增强位图缓存、加载与取消 |
 | reader/image-page-view.ts | 固定原图尺寸和可拖动画质对比 |
 | reader/comic-scroll-reader.ts | 最多五页的漫画上下阅读、拖动与页顶对齐 |
 | reader/spread-layout.ts | 双页分组、封面与翻页步长 |
@@ -162,6 +163,7 @@ vendor 保存经过必要修补、固定版本的源码。直接删除会使小�
 | tests/core/storage.spec.ts | 设置迁移与异常恢复 |
 | tests/core/groups.spec.ts | 分组、卷序与合并 |
 | tests/core/range.spec.ts | HTTP 区间和版本边界 |
+| tests/core/enhancement.spec.ts | 超分输出尺寸策略 |
 | tests/e2e/comic.spec.ts | 漫画分类、动画、声音、上下阅读与缩放 |
 | tests/e2e/regression.spec.ts | TXT／EPUB／PDF、单双页、全屏设置与隔离 |
 | tests/e2e/reading-upgrade.spec.ts | 封面、主题、计时、漫画双页 |

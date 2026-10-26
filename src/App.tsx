@@ -103,6 +103,35 @@ function messageOf(error: unknown) {
 function readableName(name: string) {
   return name.replace(/\.[^.]+$/, "");
 }
+const nextFrame = () =>
+  new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+/** 原生 setFullscreen 返回时 WebView 视口往往尚未更新，两帧之后读到的仍可能
+ * 是中间尺寸。等待视口与原生客户区一致、且连续数帧不变，再统一重排；
+ * 超时后交给阅读器自己的 ResizeObserver 收尾。
+ */
+async function settleViewport(host: HTMLElement | null) {
+  const nativeWindow = native ? getCurrentWindow() : undefined;
+  const deadline = performance.now() + 1500;
+  let last = "";
+  let stable = 0;
+  while (performance.now() < deadline) {
+    await nextFrame();
+    const rect = host?.getBoundingClientRect();
+    const key = `${innerWidth}:${innerHeight}:${devicePixelRatio}:${rect?.width}:${rect?.height}`;
+    stable = key === last ? stable + 1 : 0;
+    last = key;
+    if (stable < 3) continue;
+    if (!nativeWindow) return;
+    const size = await nativeWindow.innerSize().catch(() => undefined);
+    if (
+      !size ||
+      (Math.abs(size.width - innerWidth * devicePixelRatio) <= 2 &&
+        Math.abs(size.height - innerHeight * devicePixelRatio) <= 2)
+    )
+      return;
+    stable = 0;
+  }
+}
 function flattenToc(
   toc: TocItem[],
   depth = 0,
@@ -130,6 +159,7 @@ export default function App() {
   const immersiveRef = useRef(false);
   immersiveRef.current = immersive;
   const fullscreenPending = useRef(false);
+  const fullscreenWanted = useRef(false);
   const [contextBook, setContextBook] = useState<{
     book: ShelfBook;
     x: number;
@@ -333,23 +363,37 @@ export default function App() {
     setMemory((current) => mergeBookMemory(current, unique));
   }, []);
   const fullscreen = useCallback(
-    async (value: boolean) => {
+    async (value: boolean): Promise<void> => {
+      // 切换途中再次按 Esc／F11：记住最后的要求，本次完成后再执行。
+      fullscreenWanted.current = value;
       if (fullscreenPending.current) return;
       fullscreenPending.current = true;
+      const host = surface.current;
       try {
         // 先结束当前翻页，再改变窗口。原生窗口与 React 布局不是同时
         // 更新的；切换期间暂停新翻页，避免把两个视口的快照混在一起。
         await queue.current;
+        // 切换期间正文会经历“全屏+界面栏”“还原窗口”等中间尺寸，各自
+        // 触发一次排版。先隐藏正文，等最终尺寸排好再显示，消除浮动。
+        if (host) host.dataset.relayout = "";
         setSettings(false);
         setTocOpen(false);
         setBookmarksOpen(false);
         setImmersive(value);
-        if (native) await getCurrentWindow().setFullscreen(value);
-        else if (value) await document.documentElement.requestFullscreen();
-        else if (document.fullscreenElement) await document.exitFullscreen();
-        await new Promise<void>((resolve) =>
-          requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
-        );
+        const command = native
+          ? getCurrentWindow().setFullscreen(value)
+          : value
+            ? document.documentElement.requestFullscreen()
+            : document.fullscreenElement
+              ? document.exitFullscreen()
+              : undefined;
+        // 窗口命令可能被系统或宿主拦截而一直不返回；不能因此让正文
+        // 一直隐藏、翻页一直暂停。超时后按当时的实际尺寸继续。
+        await Promise.race([
+          command,
+          new Promise((resolve) => setTimeout(resolve, 2000)),
+        ]);
+        await settleViewport(host);
         run((reader) => reader.resize(), true);
         await queue.current;
         surface.current?.focus({ preventScroll: true });
@@ -357,11 +401,48 @@ export default function App() {
         setImmersive(false);
         fail(error);
       } finally {
+        if (host) delete host.dataset.relayout;
         fullscreenPending.current = false;
       }
+      if (fullscreenWanted.current !== value)
+        await fullscreen(fullscreenWanted.current);
     },
     [fail, run],
   );
+  useEffect(() => {
+    // 浏览器 Esc、系统快捷键等可能绕过应用退出全屏；以实际窗口状态为准，
+    // 走同一套隐藏→等待尺寸稳定→重排流程。
+    const sync = (actual: boolean) => {
+      if (actual !== immersiveRef.current && !fullscreenPending.current)
+        void fullscreen(actual);
+    };
+    if (!native) {
+      const change = () => sync(!!document.fullscreenElement);
+      document.addEventListener("fullscreenchange", change);
+      return () => document.removeEventListener("fullscreenchange", change);
+    }
+    const appWindow = getCurrentWindow();
+    let alive = true;
+    let unlisten: (() => void) | undefined;
+    void appWindow
+      .onResized(() => {
+        if (!immersiveRef.current || fullscreenPending.current) return;
+        void appWindow
+          .isFullscreen()
+          .then((actual) => {
+            if (alive) sync(actual);
+          })
+          .catch(() => {});
+      })
+      .then((value) => {
+        if (alive) unlisten = value;
+        else value();
+      });
+    return () => {
+      alive = false;
+      unlisten?.();
+    };
+  }, [fullscreen]);
   const open = useCallback(
     async (book: ShelfBook) => {
       const sequence = ++opening.current;
@@ -1187,8 +1268,10 @@ export default function App() {
               )}
             </div>
             <div className="reader-stage" data-testid="reader-stage">
+              {/* 阅读器会在此节点上增删 fixed-surface、vertical-surface 等类名；
+                  className 必须保持不变，否则 React 重渲染会把它们清掉。 */}
               <div
-                className={`reader-surface ${snapshot?.reflow === false ? "fixed-surface" : ""}`}
+                className="reader-surface"
                 ref={surface}
                 tabIndex={-1}
                 aria-label="书籍正文"

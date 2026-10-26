@@ -29,6 +29,22 @@ export interface ReadingMemory {
   groups?: BookGroup[];
 }
 const KEY = "animeread:reading:v1";
+/** 只恢复当前真实存在的设置，不再把旧接口配置或未知字段写回磁盘。
+ * 默认设置同时充当字段白名单，新功能需先定义默认值再参与持久化。
+ * 字段值的类型和范围仍由下方各项恢复逻辑校验。
+ */
+function restoreSettings<T extends object>(defaults: T, input: unknown): T {
+  const saved =
+    input && typeof input === "object" && !Array.isArray(input)
+      ? (input as Record<string, unknown>)
+      : {};
+  return Object.fromEntries(
+    Object.entries(defaults).map(([key, fallback]) => [
+      key,
+      Object.hasOwn(saved, key) ? saved[key] : fallback,
+    ]),
+  ) as T;
+}
 function nonNegative(value: unknown) {
   const number = Number(value);
   return Number.isFinite(number)
@@ -107,16 +123,21 @@ function restoreBooks(value: unknown): Record<string, BookMemory> {
 export function loadMemory(): ReadingMemory {
   try {
     const value = JSON.parse(localStorage.getItem(KEY) ?? "{}");
-    const style = { ...DEFAULT_STYLE, ...(value.style ?? {}) };
+    const style = restoreSettings(DEFAULT_STYLE, value.style);
     if (![2, 3, 4].includes(value.version)) style.zoom = DEFAULT_STYLE.zoom;
     style.comicLayout = style.comicLayout === "double" ? "double" : "single";
-    for (const obsolete of [
-      "imageFit",
-      "enhanceScale",
-      "enhanceNoise",
-      "enhanceSoften",
-    ])
-      delete style[obsolete];
+    if (typeof style.fontFamily !== "string" || !style.fontFamily.trim())
+      style.fontFamily = DEFAULT_STYLE.fontFamily;
+    style.fontFamily = style.fontFamily.slice(0, 120);
+    // 无效编码会让 TextDecoder 抛错，整本 TXT 无法打开。
+    if (
+      !["auto", "utf-8", "gb18030", "utf-16le", "utf-16be"].includes(
+        style.encoding,
+      )
+    )
+      style.encoding = DEFAULT_STYLE.encoding;
+    style.bold = style.bold === true;
+    style.italic = style.italic === true;
     style.fontSize = Math.max(12, Math.min(64, Number(style.fontSize) || 22));
     style.margin = Math.max(12, Math.min(120, Number(style.margin) || 48));
     style.lineHeight = Math.max(
@@ -143,7 +164,7 @@ export function loadMemory(): ReadingMemory {
       style.direction = "ltr";
     if (!["instant", "slide", "curl"].includes(style.motion))
       style.motion = "slide";
-    const appearance = { ...DEFAULT_APPEARANCE, ...value.appearance };
+    const appearance = restoreSettings(DEFAULT_APPEARANCE, value.appearance);
     appearance.backgroundKind =
       appearance.backgroundKind === "video" ? "video" : "image";
     for (const key of ["welcomeTitle", "welcomeSubtitle"] as const)

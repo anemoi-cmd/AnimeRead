@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { DEFAULT_STYLE } from "../../src/reader-types";
 import {
   loadMemory,
+  saveMemory,
   mergeBookMemory,
   type ReadingMemory,
 } from "../../src/reading-storage";
@@ -49,6 +50,34 @@ test("翻页速度和木纹主题持久化，损坏速度不会令翻页锁死",
     saved = JSON.stringify({ version: 4, style: { turnDuration: invalid } });
     expect(loadMemory().style.turnDuration).toBe(expected);
   }
+});
+
+test("清理旧接口配置再保存时保留书签、进度和有效外观", () => {
+  const location = { kind: "fixed", page: 12, progress: 0.3 };
+  const bookmark = { id: "saved", label: "书签", location, created: 1 };
+  const book = { location, bookmarks: [bookmark], readingMillis: 12000 };
+  saved = JSON.stringify({
+    version: 4,
+    apiKey: "obsolete-test-value",
+    ai: { enabled: true },
+    style: { fontFamily: "SimSun", voiceId: "unused", apiKey: "unused" },
+    appearance: { welcomeTitle: "我的书架", aiEndpoint: "unused" },
+    books: { retained: book },
+  });
+  const store = vi.fn();
+  vi.stubGlobal("localStorage", { getItem: () => saved, setItem: store });
+  const memory = loadMemory();
+  expect(memory.style.fontFamily).toBe("SimSun");
+  expect(memory.appearance?.welcomeTitle).toBe("我的书架");
+  expect(memory.books.retained).toMatchObject(book);
+  saveMemory(memory);
+  const persisted = JSON.parse(store.mock.calls[0][1]);
+  expect(persisted).not.toHaveProperty("apiKey");
+  expect(persisted).not.toHaveProperty("ai");
+  expect(persisted.style).not.toHaveProperty("voiceId");
+  expect(persisted.style).not.toHaveProperty("apiKey");
+  expect(persisted.appearance).not.toHaveProperty("aiEndpoint");
+  expect(persisted.books.retained).toMatchObject(book);
 });
 
 test("重复书目合并采用最新进度并保留两份记录的全部书签", () => {

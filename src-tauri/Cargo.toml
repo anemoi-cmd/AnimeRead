@@ -1,6 +1,6 @@
 [package]
 name = "animeread"
-version = "0.9.6"
+version = "0.9.7"
 description = "Windows novel and comic reader"
 license = "MIT"
 edition = "2021"
@@ -24,7 +24,7 @@ sha2 = "0.10"
 fontdb = "0.23"
 zip = { version = "=8.6.0", default-features = false, features = ["deflate"] }
 roxmltree = "0.21"
-image = { version = "0.25", default-features = false, features = ["png"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp"] }
 
 [profile.release]
 strip = true

@@ -7,7 +7,7 @@ export class ImageFrame {
   readonly element = document.createElement("div");
   readonly width: number;
   readonly height: number;
-  private enhanced?: HTMLImageElement;
+  private enhanced?: PageImage;
   private divider = document.createElement("button");
   private labels = document.createElement("div");
   private split = 50;
@@ -69,7 +69,7 @@ export class ImageFrame {
     this.divider.setAttribute("aria-valuenow", String(Math.round(this.split)));
   }
   enhance(
-    image: HTMLImageElement,
+    image: PageImage,
     compare: boolean,
     enhancement?: ReaderSnapshot["enhancement"],
   ) {
@@ -89,3 +89,4 @@ export class ImageFrame {
   }
 }
 import type { ReaderSnapshot } from "../reader-types";
+import type { PageImage } from "./image-page-cache";

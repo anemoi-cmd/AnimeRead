@@ -820,6 +820,12 @@ button svg {
   width: 100%;
   height: 100%;
   outline: none;
+  transition: opacity 120ms ease-out;
+}
+/* 全屏切换的中间尺寸不显示；最终排版完成后淡入。 */
+.reader-surface[data-relayout] {
+  opacity: 0;
+  transition: none;
 }
 .foliate-surface {
   display: block;
@@ -927,6 +933,7 @@ button svg {
   isolation: isolate;
 }
 .fixed-surface .image-frame > img,
+.fixed-surface .image-frame > canvas,
 .fixed-surface .pdf-page > canvas {
   mix-blend-mode: var(--paper-blend, normal);
 }

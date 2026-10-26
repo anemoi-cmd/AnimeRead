@@ -1,5 +1,6 @@
 import type { FilterMode } from "../reader-types";
-type Output = { blob: Blob; scale: number; device: string };
+import type { EnhanceTarget } from "./output-size";
+type Output = { bitmap: ImageBitmap; scale: number; device: string };
 let worker: Worker | undefined;
 let sequence = 0;
 const jobs = new Map<
@@ -17,7 +18,11 @@ function getWorker() {
   });
   worker.onmessage = ({ data }) => {
     const job = jobs.get(data.id);
-    if (!job) return;
+    if (!job) {
+      // 已取消的任务仍可能送回位图；立即释放显存。
+      (data.output?.bitmap as ImageBitmap | undefined)?.close();
+      return;
+    }
     jobs.delete(data.id);
     job.cleanup();
     if (data.error) job.reject(new Error(data.error));
@@ -28,19 +33,21 @@ function getWorker() {
   return worker;
 }
 export async function anime4kImage(
-  image: HTMLImageElement,
+  source: Blob,
   filters: FilterMode[],
+  target: EnhanceTarget | undefined,
   signal?: AbortSignal,
 ): Promise<Output> {
   signal?.throwIfAborted();
-  const bitmap = await createImageBitmap(image);
+  // 直接从压缩数据解码，避免在主线程再画一遍已解码的图片。
+  const bitmap = await createImageBitmap(source);
   if (signal?.aborted) {
     bitmap.close();
     signal.throwIfAborted();
   }
-  let target: Worker;
+  let thread: Worker;
   try {
-    target = getWorker();
+    thread = getWorker();
   } catch (error) {
     bitmap.close();
     throw error;
@@ -48,7 +55,7 @@ export async function anime4kImage(
   const id = ++sequence;
   return new Promise<Output>((resolve, reject) => {
     const abort = () => {
-      target.postMessage({ type: "cancel", id });
+      thread.postMessage({ type: "cancel", id });
       jobs.delete(id);
       signal?.removeEventListener("abort", abort);
       reject(new DOMException("增强已取消", "AbortError"));
@@ -60,7 +67,9 @@ export async function anime4kImage(
     });
     signal?.addEventListener("abort", abort, { once: true });
     try {
-      target.postMessage({ type: "image", id, bitmap, filters }, [bitmap]);
+      thread.postMessage({ type: "image", id, bitmap, filters, target }, [
+        bitmap,
+      ]);
     } catch (error) {
       jobs.delete(id);
       signal?.removeEventListener("abort", abort);
@@ -69,7 +78,15 @@ export async function anime4kImage(
     }
   });
 }
-export function releaseAnime4k(
+/** 后台预先编译模型；失败时静默，真正处理页面时再报告。 */
+export function warmAnime4k(filters: FilterMode[]) {
+  try {
+    getWorker().postMessage({ type: "warm", filters });
+  } catch {
+    // Worker 无法创建时，处理页面会走正常的错误提示。
+  }
+}
+function releaseAnime4k(
   error: Error = new DOMException("增强已取消", "AbortError"),
 ) {
   worker?.terminate();

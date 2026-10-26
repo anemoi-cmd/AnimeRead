@@ -249,6 +249,7 @@ export class NovelReader implements ReaderEngine {
     );
     this.snapshot.toc = this.book.toc ?? [];
     this.snapshot.reflow = this.book.rendition?.layout !== "pre-paginated";
+    host.classList.toggle("fixed-surface", !this.snapshot.reflow);
     this.view = document.createElement("foliate-view") as FoliateView;
     this.view.className = "foliate-surface";
     this.view.addEventListener("external-link", (event) =>
@@ -540,7 +541,7 @@ export class NovelReader implements ReaderEngine {
     this.unbind.forEach((unbind) => unbind());
     this.unbind.clear();
     this.unbindHost?.();
-    this.host?.classList.remove("novel-spread");
+    this.host?.classList.remove("novel-spread", "fixed-surface");
     try {
       this.view?.close();
     } catch {
