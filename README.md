@@ -1,62 +1,72 @@
-# AnimeRead
+<p align="center">
+  <img src="public/icon.svg" width="112" alt="AnimeRead 图标">
+</p>
 
-Windows 小说与漫画阅读器，当前版本 **0.9.7**。基于 Tauri 2、Rust、React、TypeScript 和 WebView2。源码进入下一版开发准备；根目录程序及已发布发行版仍为 0.9.6。
+<h1 align="center">AnimeRead</h1>
 
-## 运行与功能
+<p align="center">一款安静、好看的 Windows 小说与漫画阅读器。<br>让故事，慢慢发生。</p>
 
-支持 Windows 10／11 x64，需要 Microsoft WebView2 Runtime。双击根目录 **AnimeRead.exe**，继续使用当前账户的阅读记录；移动程序时一起复制 **runtime**。阅读无需开发环境。
+<p align="center">
+  <a href="https://github.com/anemoi-cmd/AnimeRead/releases/latest"><b>⬇ 下载最新版</b></a>
+  ·
+  <a href="docs/USER_GUIDE.md">使用说明</a>
+  ·
+  <a href="CHANGELOG.md">更新记录</a>
+</p>
 
-发行包：**便携 ZIP** 解压后运行，记录保存在自身的 data 目录；**安装 EXE** 安装到当前账户，注册表仅使用本应用的 HKCU 键，卸载默认保留阅读记录。两包不附带书籍、私人记录或背景。不支持 Windows 7／8。若电脑缺少 WebView2，安装版会联网下载微软运行时，便携版需先安装该运行时。
+---
 
-- TXT、文字／漫画 EPUB、PDF、CBZ／ZIP、常用图片，自动分类和读取封面。
-- 系统字体与文字排版、单双页、小说书脊、缩放、左右和上下阅读。
-- 即时、滑动、可调速度的拖动仿真翻页与翻书声；全屏设置、书签、进度、阅读计时。
-- 漫画纸张／墨水与木纹合成底色；软件内签名更新，便携／安装渠道分别升级。
-- 同名系列自动分组、自定义卷序与轮换封面；移动文件重新导入可合并记录。
-- Anime4K／Waifu2x、顺序滤镜链、后台增强与预缓存、原图／增强拖线对比。
-- 最近阅读封面／时间、自定义首页文字、雨景与雨声、主题配色和图片／视频壁纸。
+## 下载与安装
 
-[使用说明](docs/USER_GUIDE.md) · [每个文件的用途](docs/FILES.md) · [架构](docs/ARCHITECTURE.md)
+前往 [最新版本页面](https://github.com/anemoi-cmd/AnimeRead/releases/latest)，二选一：
 
-[版本下载](https://github.com/anemoi-cmd/AnimeRead/releases/latest) · [发布与软件内更新](docs/RELEASE.md) · [小说朗读方案与素材清单](docs/VOICE_TRAINING.md)
+| 文件 | 适合谁 |
+| --- | --- |
+| **AnimeRead-版本号-setup.exe** | 想像普通软件一样安装、在开始菜单里打开。卸载时默认保留阅读记录。 |
+| **AnimeRead-版本号-portable.zip** | 想放在 U 盘或任意文件夹里用。解压后双击 AnimeRead.exe，记录保存在旁边的 data 文件夹。 |
 
-待开发：小说朗读、按需声音包和网盘账号接入。当前没有小说 AI 服务、API 密钥设置或朗读后端；有效设置按白名单恢复，旧接口字段不再保存。声音方案先在独立环境验证，再接入阅读器。当前不支持 DRM／密码文件及 RAR／7z。
+需要 Windows 10 或 11（64 位）。安装版会自动准备所需的系统组件（Microsoft WebView2）；如果便携版打不开，请先安装 [WebView2 运行时](https://developer.microsoft.com/microsoft-edge/webview2/)。
 
-Anime4K 需要硬件 WebGPU；Waifu2x 支持 NVIDIA／AMD／Intel Vulkan 显卡。本版实际验证 NVIDIA 独显和 AMD 核显，Intel 与 Windows 10 尚未实机验证。CPU 不支持超分；无可用硬件显卡时自动关闭，增强、引擎、滤镜与对比选项不可选。处理失败保留原图，阅读和翻页仍可使用。
+以后有新版本时，在软件左下角 **设置 → 软件更新** 里一键升级，书籍、书签和阅读进度都会保留。
 
-## 开发
+## 能做什么
 
-安装 Node.js 22.13+、pnpm 11.19.0、Rust MSVC、Microsoft C++ Build Tools，详见 [构建说明](docs/BUILD.md)。
+**📚 一个书架装下小说和漫画**
+TXT、EPUB、PDF、CBZ／ZIP 压缩包和图片都能直接拖进来读。自动识别小说或漫画、读取封面，记住每本书读到哪里、读了多久。
 
-~~~powershell
-pnpm install --frozen-lockfile
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/reader.ps1 -Action Dev
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/reader.ps1 -Action Build
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/reader.ps1 -Action Package
-~~~
+**📖 舒服的阅读体验**
+单页或双页、左右翻或从上往下滚动；仿真翻书动画和翻书声；纸张、墨水、木纹等多种底色；小说可以自由调整字体、字号和行距。
 
-pnpm install --frozen-lockfile 按锁文件安装开发依赖；锁文件与依赖声明不一致会报错，不自动更改版本。仅阅读已编译程序时不需要运行它。
+**✨ 让旧漫画变清晰**
+借助显卡的超分辨率处理，让低清扫描的线条和文字更锐利，翻页时在后台自动完成。拖动对比线就能看到前后差别。
 
-构建／测试缓存默认在 %LOCALAPPDATA%/AnimeRead/build-cache，程序输出到项目根目录。node scripts/setup-enhancement.mjs 可安装经 SHA-256 校验的 Waifu2x 扩展到 runtime/waifu2x。
+**🗂 多卷整理成套**
+自动发现同一系列的多卷书，一键归成一组；以后导入的新卷会自动加入。
 
-## 验证与版本
+**🎨 按你的喜好装扮**
+主题色、首页欢迎语、图片或视频壁纸、可调节的液态玻璃质感，还有雨景和雨声陪你读书。
 
-~~~powershell
-pnpm check
-pnpm test
-pnpm build
-pnpm test:e2e
-pnpm audit:code
-pnpm format:check
-node scripts/cargo.mjs fmt --manifest-path src-tauri/Cargo.toml --check
-node scripts/cargo.mjs clippy --manifest-path src-tauri/Cargo.toml --locked -- -D warnings
-node scripts/cargo.mjs test --manifest-path src-tauri/Cargo.toml --locked
-~~~
+## 隐私
 
-可选实机验收：设置 ANIMEREAD_TEST_BOOK 指向自己的 170 页漫画 EPUB，运行 node scripts/verify-comic-native.mjs --full-gpu --stress 和 node scripts/verify-enhancement.mjs --stress。使用独立书架与 WebView2 配置，不修改原书；普通 CI 跳过私有书籍和 GPU 场景。
+AnimeRead 完全在本机运行，不需要账号。阅读记录只保存在你的电脑上，书籍文件留在原来的位置，软件不会上传或修改它们。联网只用于检查软件更新。
 
-pnpm version:next 同步递增项目补丁版本；--dry-run 只预览，--set 指定版本。源码导出：node scripts/package-source.mjs，排除程序、模型二进制、依赖、缓存和个人资料。用户小说验收可设置 ANIMEREAD_TEST_NOVELS 为自己的 EPUB 目录。
+## 常见问题
+
+**支持哪些格式？** TXT、EPUB、PDF、CBZ、ZIP，以及 PNG／JPG／WebP 等图片。暂不支持 RAR／7z 和带 DRM 或密码的文件。
+
+**超分需要什么电脑？** 需要一块显卡（独立显卡或较新的核显都可以）。没有可用显卡时这个功能会自动关闭，其他功能照常使用。
+
+**遇到问题怎么办？** 欢迎在 [Issues](https://github.com/anemoi-cmd/AnimeRead/issues) 里告诉我们，附上系统版本和出问题的步骤会很有帮助。
+
+---
+
+<details>
+<summary>开发者信息</summary>
+
+AnimeRead 基于 Tauri 2、Rust、React 和 TypeScript。编译方法见 [构建说明](docs/BUILD.md)，代码结构见 [架构](docs/ARCHITECTURE.md) 与 [文件说明](docs/FILES.md)，发布流程见 [发布说明](docs/RELEASE.md)，参与方式见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+</details>
 
 ## 许可
 
-自有源码采用 [MIT](LICENSE)，第三方代码与模型条款见 [许可记录](THIRD_PARTY_NOTICES.md)。参与开发见 [CONTRIBUTING.md](CONTRIBUTING.md)，问题报告见 [SECURITY.md](SECURITY.md)。
+源码采用 [MIT](LICENSE) 许可，第三方组件与素材的许可见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

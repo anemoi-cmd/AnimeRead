@@ -56,15 +56,17 @@
 | vendor.d.ts | 第三方 JS 模块的 TypeScript 声明 |
 | components/LibraryShelf.tsx | 分页书架、最近阅读封面／时间、轮换分组封面、总阅读时间 |
 | components/BookCard.tsx | 单本封面、进度、阅读时间 |
-| components/BookMenu.tsx | 书目右键删除与更多工具菜单 |
-| components/GroupManager.tsx | 分组与卷序编辑 |
+| components/BookMenu.tsx | 书目右键：加入分组、删除与更多工具 |
+| components/GroupManager.tsx | 分组、卷序编辑、系列建议与自动保存 |
+| components/SettingsCenter.tsx | 软件设置统一入口（外观、更新、说明、关于），新功能在此加页 |
+| components/BrandMark.tsx | 应用图标的 SVG 图形，侧栏与“关于”共用 |
 | components/Preferences.tsx | 阅读排版、单双页、增强与雨景设置 |
-| components/AppearanceSettings.tsx | 软件主题、首页文字和图片／视频壁纸入口 |
+| components/AppearanceSettings.tsx | 外观页：主题色、液态玻璃强度、首页文字和壁纸 |
 | components/VideoWallpaper.tsx | 书架视频播放，失焦暂停、阅读卸载 |
 | components/FilterStack.tsx | A／B／C 预设、添加、排序、删除 |
 | components/ReaderProgress.tsx | 可拖动进度条与位置显示 |
-| components/Help.tsx | 从 USER_GUIDE.md 显示帮助，避免重复文案 |
-| components/SoftwareUpdate.tsx | 软件内检查、下载进度与升级入口 |
+| components/Help.tsx | 使用说明页，内容来自面向用户的 USER_GUIDE.md |
+| components/SoftwareUpdate.tsx | 软件更新页：检查、下载进度与升级 |
 | components/Rain.tsx | 雨景画布与动画生命周期 |
 | ambience/rain-field.ts | 有界雨丝、水滴、滑落与尾迹 |
 | ambience/reading-sounds.ts | 雨声与翻书录音共用解码缓存和 AudioContext，雨声交叉淡入淡出 |
@@ -104,7 +106,7 @@
 | src-tauri/windows/portable-update.ps1 | 退出后替换便携程序，失败回滚，保留数据 |
 | src-tauri/windows/hooks.nsh | Windows 10 安装边界、去除发布者字段与本应用注册表清理 |
 | src-tauri/icons/icon.ico、icon.png | Windows 程序与安装包图标 |
-| public/icon.svg | 前端图标原始资源 |
+| public/icon.svg | 图标矢量原稿（由 BrandMark 图形导出，程序图标据此生成） |
 | public/audio/rain.ogg、page-turn.wav | 有明确再发行许可的雨声与翻书录音，嵌入程序 |
 | runtime/waifu2x/waifu2x-ncnn-vulkan.exe | 实际运行增强的程序，约 5 MB；不是 C++ 编译器 |
 | runtime/waifu2x/vcomp140.dll | 增强程序所需 OpenMP 运行库 |

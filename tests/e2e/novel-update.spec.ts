@@ -246,7 +246,7 @@ test("首页自定义文字、视频壁纸循环与重启恢复，读书时卸�
     stream.getTracks().forEach((track) => track.stop());
     return Array.from(new Uint8Array(await blob.arrayBuffer()));
   });
-  await page.getByRole("button", { name: "外观设置", exact: true }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByLabel("欢迎语", { exact: true }).fill("今天也读一会儿");
   await page.getByLabel("副标题", { exact: true }).fill("我的阅读空间");
   await page.getByLabel("选择背景图片或视频文件").setInputFiles({
@@ -254,7 +254,7 @@ test("首页自定义文字、视频壁纸循环与重启恢复，读书时卸�
     mimeType: "video/webm",
     buffer: Buffer.from(bytes),
   });
-  await page.getByLabel("关闭外观设置").click();
+  await page.getByLabel("关闭设置").click();
   await expect(
     page.getByRole("heading", { name: "今天也读一会儿" }),
   ).toBeVisible();

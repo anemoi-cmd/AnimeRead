@@ -235,27 +235,47 @@ export function LibraryShelf({
             <span>{group ? books.length + " 卷" : visible.length}</span>
           </h2>
         </div>
-        <div className="shelf-heading-actions">
-          <button className="outline-button" onClick={manageGroups}>
-            <Folders size={16} />
-            管理分组
-          </button>
-          <div className="shelf-tabs">
-            {[
-              { id: "all", name: "全部" },
-              { id: "novel", name: "小说" },
-              { id: "comic", name: "漫画" },
-            ].map((mode) => (
-              <button
-                key={mode.id}
-                className={shelfMode === mode.id ? "selected" : ""}
-                onClick={() => modeChange(mode.id)}
-              >
-                {mode.name}
-              </button>
-            ))}
+        {group ? (
+          // 分组内只有这一套书：显示合计信息和编辑入口，不再显示类别切换。
+          <div className="shelf-heading-actions">
+            <span className="group-summary">
+              <Clock3 size={15} />
+              共读{" "}
+              {formatReadingTime(
+                group.bookIds.reduce(
+                  (sum, id) => sum + (memory.books[id]?.readingMillis ?? 0),
+                  0,
+                ),
+              )}
+            </span>
+            <button className="outline-button" onClick={manageGroups}>
+              <Folders size={16} />
+              编辑分组
+            </button>
           </div>
-        </div>
+        ) : (
+          <div className="shelf-heading-actions">
+            <button className="outline-button" onClick={manageGroups}>
+              <Folders size={16} />
+              管理分组
+            </button>
+            <div className="shelf-tabs">
+              {[
+                { id: "all", name: "全部" },
+                { id: "novel", name: "小说" },
+                { id: "comic", name: "漫画" },
+              ].map((mode) => (
+                <button
+                  key={mode.id}
+                  className={shelfMode === mode.id ? "selected" : ""}
+                  onClick={() => modeChange(mode.id)}
+                >
+                  {mode.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
       {shown.length ? (
         <div className="book-grid">

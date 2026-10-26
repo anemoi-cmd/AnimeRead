@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
-import { X, ImagePlus } from "lucide-react";
+import { ImagePlus } from "lucide-react";
 import { PALETTES, type Appearance } from "../appearance-settings";
 
-function AppearanceOptions({
+export function AppearanceOptions({
   value,
   change,
   background,
@@ -42,6 +42,28 @@ function AppearanceOptions({
             }
           />
         </label>
+      </div>
+      <div className="setting-group">
+        <h3>液态玻璃</h3>
+        <label className="range-label" htmlFor="glass-strength">
+          玻璃质感
+          <output>
+            {value.glass === 0 ? "关闭" : `${Math.round(value.glass * 100)}%`}
+          </output>
+        </label>
+        <input
+          id="glass-strength"
+          aria-label="液态玻璃强度"
+          type="range"
+          min="0"
+          max="1"
+          step="0.05"
+          value={value.glass}
+          onChange={(event) => change({ glass: Number(event.target.value) })}
+        />
+        <p className="setting-note">
+          侧栏、首页卡片、面板和弹窗的通透程度。配合背景壁纸效果最明显；调到最左为不透明。
+        </p>
       </div>
       <div className="setting-group">
         <h3>背景壁纸</h3>
@@ -114,32 +136,5 @@ function AppearanceOptions({
         />
       </div>
     </>
-  );
-}
-export function AppearanceSettings({
-  close,
-  ...props
-}: Parameters<typeof AppearanceOptions>[0] & { close: () => void }) {
-  return (
-    <div className="modal-backdrop">
-      <section
-        className="appearance-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="外观设置"
-      >
-        <div className="panel-heading">
-          <h2>外观设置</h2>
-          <button
-            className="icon-button"
-            aria-label="关闭外观设置"
-            onClick={close}
-          >
-            <X size={18} />
-          </button>
-        </div>
-        <AppearanceOptions {...props} />
-      </section>
-    </div>
   );
 }

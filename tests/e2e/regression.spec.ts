@@ -555,12 +555,13 @@ test("全屏设置可打开，外观选项和引擎解释仅放在各自入口",
   if (await page.getByLabel("关闭阅读设置").isVisible())
     await page.getByLabel("关闭阅读设置").click();
   await page.getByLabel("返回书架", { exact: true }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("button", { name: "使用说明", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "使用说明" })).toContainText(
-    "只有 A 改变尺寸",
+  await expect(page.getByRole("dialog", { name: "设置" })).toContainText(
+    "A 是放大并锐化",
   );
-  await expect(page.getByRole("dialog", { name: "使用说明" })).toContainText(
-    "滤镜是处理步骤",
+  await expect(page.getByRole("dialog", { name: "设置" })).toContainText(
+    "画质对比",
   );
 });
 

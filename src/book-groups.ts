@@ -76,17 +76,50 @@ export function remapGroups(
   );
 }
 
+const VOLUME =
+  /(?:第\s*)?[零〇一二三四五六七八九十百\d]+\s*[卷巻册集部]|[卷巻册集部]\s*[零〇一二三四五六七八九十百\d]+|\bvol(?:ume)?\.?\s*\d+/gi;
 function seriesKey(name: string) {
   return name
     .normalize("NFKC")
     .toLowerCase()
     .replace(/\.[a-z0-9]{2,5}$/i, "")
-    .replace(
-      /(?:第\s*)?[零〇一二三四五六七八九十百\d]+\s*[卷巻册集部]|[卷巻册集部]\s*[零〇一二三四五六七八九十百\d]+|\bvol(?:ume)?\.?\s*\d+/gi,
-      "",
-    )
+    .replace(VOLUME, "")
     .replace(/[\s_\-–—]+\d{1,3}\s*$/, "")
     .replace(/[\p{P}\p{Z}\s]/gu, "");
+}
+/** 给用户看的系列名：去掉扩展名、卷号和多余标点，保留原文字形。 */
+export function seriesTitle(name: string) {
+  return (
+    name
+      .replace(/\.[a-z0-9]{2,5}$/i, "")
+      .replace(VOLUME, "")
+      .replace(/[\s_\-–—]+\d{1,3}\s*$/, "")
+      .replace(/[\s_\-–—·:：()（）[\]【】]+$/u, "")
+      .replace(/^[\s_\-–—·:：()（）[\]【】]+/u, "")
+      .trim() || name.replace(/\.[a-z0-9]{2,5}$/i, "")
+  );
+}
+/** 未分组书籍中同一系列出现两卷以上时，建议建立分组。 */
+export function suggestSeries(
+  groups: BookGroup[],
+  books: { id: string; name: string }[],
+  titles: Record<string, { title?: string }> = {},
+) {
+  const grouped = new Set(groups.flatMap((group) => group.bookIds));
+  const existing = new Set(groups.map((group) => seriesKey(group.name)));
+  const series = new Map<string, { name: string; ids: string[] }>();
+  for (const book of books) {
+    if (grouped.has(book.id)) continue;
+    const label = titles[book.id]?.title || book.name;
+    const key = seriesKey(label);
+    if (!key || existing.has(key)) continue;
+    const entry = series.get(key) ?? { name: seriesTitle(label), ids: [] };
+    entry.ids.push(book.id);
+    series.set(key, entry);
+  }
+  return [...series.values()]
+    .filter((entry) => entry.ids.length > 1)
+    .sort((a, b) => b.ids.length - a.ids.length);
 }
 /** Match complete series names; never steal manually assigned or excluded volumes. */
 export function autoGroupBooks(

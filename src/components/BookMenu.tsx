@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
-import { Trash2, ChevronRight, Info } from "lucide-react";
+import { Trash2, ChevronRight, Info, FolderPlus } from "lucide-react";
 
 export function BookMenu({
   x,
   y,
   remove,
+  group,
   help,
   close,
 }: {
   x: number;
   y: number;
   remove: () => void;
+  group: () => void;
   help: () => void;
   close: () => void;
 }) {
@@ -39,9 +41,13 @@ export function BookMenu({
       data-no-page
       style={{
         left: Math.min(x, innerWidth - 190),
-        top: Math.min(y, innerHeight - 130),
+        top: Math.min(y, innerHeight - 170),
       }}
     >
+      <button role="menuitem" onClick={group}>
+        <FolderPlus size={16} />
+        加入分组
+      </button>
       <button role="menuitem" onClick={remove}>
         <Trash2 size={16} />
         从书架删除

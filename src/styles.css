@@ -182,20 +182,14 @@ button svg {
   background: var(--accent-faint);
 }
 .brand-icon {
-  display: grid;
-  place-items: center;
-  width: 38px;
-  height: 38px;
-  background: linear-gradient(
-    145deg,
-    color-mix(in srgb, var(--accent) 80%, white),
-    var(--accent-strong)
-  );
-  color: var(--on-accent);
-  border-radius: 11px;
-  box-shadow:
-    inset 0 1px 0 #ffffff40,
-    0 4px 12px color-mix(in srgb, var(--accent) 35%, transparent);
+  display: block;
+  width: 40px;
+  height: 40px;
+  flex: none;
+  filter: drop-shadow(0 4px 10px #23485a3d);
+}
+.brand-mark {
+  display: block;
 }
 .brand small {
   display: block;
@@ -294,15 +288,6 @@ button svg {
   opacity: var(--wallpaper-opacity);
   pointer-events: none;
   z-index: -1;
-}
-.has-wallpaper .sidebar,
-.has-wallpaper .topbar {
-  background: color-mix(in srgb, var(--panel) 78%, transparent);
-  backdrop-filter: blur(18px) saturate(1.2);
-}
-.has-wallpaper .welcome {
-  background: color-mix(in srgb, var(--surface) 80%, transparent);
-  backdrop-filter: blur(14px);
 }
 .has-wallpaper .reader-layout {
   background: transparent !important;
@@ -1137,7 +1122,7 @@ button svg {
 /* 自绘滑块：细轨道 + 圆点，深浅主题都清晰。 */
 .progress-control input,
 .preferences input[type="range"],
-.appearance-modal input[type="range"] {
+.settings-center input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
@@ -1148,14 +1133,14 @@ button svg {
 }
 .progress-control input::-webkit-slider-runnable-track,
 .preferences input[type="range"]::-webkit-slider-runnable-track,
-.appearance-modal input[type="range"]::-webkit-slider-runnable-track {
+.settings-center input[type="range"]::-webkit-slider-runnable-track {
   height: 4px;
   border-radius: 4px;
   background: color-mix(in srgb, currentColor 16%, transparent);
 }
 .progress-control input::-webkit-slider-thumb,
 .preferences input[type="range"]::-webkit-slider-thumb,
-.appearance-modal input[type="range"]::-webkit-slider-thumb {
+.settings-center input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 14px;
   height: 14px;
@@ -1346,10 +1331,10 @@ button svg {
   margin: 14px 0 6px;
 }
 .preferences select,
-.appearance-modal select,
+.settings-center select,
 .group-editor > input,
-.appearance-modal input:not([type]),
-.appearance-modal input[type="text"] {
+.settings-center input:not([type]),
+.settings-center input[type="text"] {
   display: block;
   width: 100%;
   height: 36px;
@@ -1587,8 +1572,7 @@ button svg {
     opacity: 0;
   }
 }
-.help-modal,
-.appearance-modal,
+.settings-center,
 .group-manager {
   max-height: 88vh;
   overflow: auto;
@@ -1604,27 +1588,6 @@ button svg {
     opacity: 0;
     transform: translateY(10px) scale(0.98);
   }
-}
-.help-modal {
-  width: 620px;
-  max-width: 100%;
-  padding: 28px 34px;
-}
-.help-modal h3 {
-  font-size: 15px;
-  margin: 26px 0 8px;
-}
-.help-modal p {
-  font-size: 13px;
-  line-height: 1.85;
-  margin: 12px 0;
-  color: var(--muted);
-}
-.help-modal code {
-  font-size: 12px;
-  padding: 1px 6px;
-  border-radius: 5px;
-  background: var(--accent-faint);
 }
 .help-keys {
   display: flex;
@@ -1666,10 +1629,6 @@ kbd {
 .enhancement-help th {
   color: var(--muted);
   font-weight: 600;
-}
-.appearance-modal {
-  width: min(480px, 92vw);
-  padding: 26px 28px;
 }
 .palette-options {
   display: grid;
@@ -2176,4 +2135,389 @@ kbd {
   width: 100%;
   box-shadow: none;
   border-radius: 0;
+}
+
+/* ==========================================================================
+   设置中心
+   ========================================================================== */
+.settings-center {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  width: min(880px, 94vw);
+  height: min(660px, 88vh);
+  padding: 0;
+  overflow: hidden;
+}
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 24px 12px;
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 55%, transparent);
+}
+.settings-nav h2 {
+  font-size: 20px;
+  font-weight: 650;
+  margin: 0 12px 18px;
+}
+.settings-nav button {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 14px;
+  color: var(--muted);
+  text-align: left;
+}
+.settings-nav button:hover:not(:disabled) {
+  background: var(--accent-faint);
+  color: var(--text);
+}
+.settings-nav button.selected {
+  background: var(--surface);
+  color: var(--accent);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+.settings-page {
+  overflow: auto;
+  padding: 24px 30px 32px;
+}
+.settings-page > .panel-heading {
+  margin-bottom: 4px;
+}
+.user-guide h3 {
+  font-size: 16px;
+  margin: 26px 0 10px;
+}
+.user-guide h3:first-child {
+  margin-top: 6px;
+}
+.user-guide p,
+.user-guide li {
+  font-size: 14px;
+  line-height: 1.85;
+  color: var(--muted);
+}
+.user-guide p {
+  margin: 10px 0;
+}
+.user-guide ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+.user-guide strong {
+  color: var(--text);
+}
+.user-guide kbd {
+  margin: 0 1px;
+}
+.about-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding-top: 24px;
+}
+.about-page .brand-mark {
+  filter: drop-shadow(0 10px 22px #23485a40);
+}
+.about-page h3 {
+  font-size: 24px;
+  margin: 16px 0 4px;
+}
+.about-page p {
+  margin: 4px 0;
+  color: var(--muted);
+}
+.about-page .setting-note {
+  max-width: 420px;
+  margin-top: 16px;
+}
+.update-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 8px;
+}
+.update-panel p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+.version-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 16px 18px;
+  border-radius: var(--radius-md);
+  background: var(--accent-faint);
+}
+.version-card span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.version-card strong {
+  font-size: 20px;
+}
+.version-card.is-new {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.update-actions {
+  display: flex;
+  gap: 10px;
+}
+.update-panel progress {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+/* ---------- 分组管理补充 ---------- */
+.group-intro {
+  margin: 6px 0 0;
+}
+.group-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-md);
+  background: var(--accent-faint);
+}
+.group-suggestions > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-right: 4px;
+}
+.suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 16px;
+  font-size: 13px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition:
+    border-color 0.16s,
+    color 0.16s;
+}
+.suggestion-chip:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.suggestion-chip small {
+  color: var(--muted);
+}
+.switch-row > span small {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+.switch-row > span:has(small) {
+  display: block;
+}
+.picker-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.picker-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.picker-filter input {
+  accent-color: var(--accent);
+}
+.group-book-picker em {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--faint);
+  white-space: nowrap;
+}
+.group-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  margin-right: 4px;
+}
+
+/* ==========================================================================
+   液态玻璃：--glass 由外观设置写入（0 不透明 … 1 最通透）。背景的柔光让
+   通透的面板有可折射的色彩；高光沿上边缘与左上角，模拟玻璃厚度。
+   ========================================================================== */
+:root {
+  --glass: 0.6;
+}
+.app-shell::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  opacity: calc(var(--glass) * 0.9);
+  background:
+    radial-gradient(
+      38% 46% at 8% 12%,
+      color-mix(in srgb, var(--theme-accent) 38%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      34% 40% at 88% 6%,
+      color-mix(in srgb, #f2b66d 34%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      44% 50% at 70% 92%,
+      color-mix(in srgb, #7aa7d9 30%, transparent),
+      transparent 70%
+    );
+}
+.app-shell.is-reading::after {
+  display: none;
+}
+.sidebar,
+.topbar,
+.welcome,
+.recent-book,
+.toc-panel,
+.preferences,
+.settings-center,
+.group-manager,
+.book-menu,
+.notice,
+.immersive-tools,
+.shelf-tabs,
+.shelf-search {
+  --glass-tint: var(--surface);
+  background-color: color-mix(
+    in srgb,
+    var(--glass-tint) calc(100% - var(--glass) * 50%),
+    transparent
+  );
+  backdrop-filter: blur(calc(var(--glass) * 30px))
+    saturate(calc(100% + var(--glass) * 80%));
+  border-color: color-mix(
+    in srgb,
+    white calc(var(--glass) * 45%),
+    var(--border)
+  );
+}
+.sidebar,
+.topbar,
+.recent-book,
+.shelf-tabs,
+.shelf-search,
+.settings-center,
+.group-manager {
+  position: relative;
+}
+.sidebar {
+  --glass-tint: var(--panel);
+}
+.topbar {
+  --glass-tint: var(--shell);
+}
+.shelf-tabs {
+  --glass-tint: var(--panel);
+}
+/* 玻璃高光层：不拦截指针，透明度随强度变化。 */
+.sidebar::after,
+.topbar::after,
+.welcome::after,
+.recent-book::after,
+.toc-panel::after,
+.preferences::after,
+.settings-center::after,
+.group-manager::after,
+.book-menu::after,
+.immersive-tools::after,
+.shelf-tabs::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      135deg,
+      rgb(255 255 255 / calc(var(--glass) * 0.32)),
+      transparent 32%
+    ),
+    linear-gradient(
+      320deg,
+      rgb(255 255 255 / calc(var(--glass) * 0.1)),
+      transparent 26%
+    );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / calc(var(--glass) * 0.8)),
+    inset 0 -1px 0 rgb(255 255 255 / calc(var(--glass) * 0.15)),
+    inset 0 0 0 1px rgb(255 255 255 / calc(var(--glass) * 0.12));
+}
+[data-theme="dark"] .app-shell::after {
+  opacity: calc(var(--glass) * 0.55);
+}
+[data-theme="dark"]
+  :is(
+    .sidebar,
+    .topbar,
+    .welcome,
+    .recent-book,
+    .toc-panel,
+    .preferences,
+    .settings-center,
+    .group-manager,
+    .book-menu,
+    .immersive-tools,
+    .shelf-tabs
+  )::after {
+  opacity: 0.45;
+}
+/* 阅读时顶栏与纸张同色，不做玻璃，避免透出正文。 */
+.is-reading .topbar {
+  backdrop-filter: none;
+}
+.is-reading .topbar::after {
+  display: none;
+}
+/* 文字密集的弹窗和阅读面板保留更多不透明度，玻璃感来自模糊与高光。 */
+.settings-center,
+.group-manager {
+  background-color: color-mix(
+    in srgb,
+    var(--glass-tint) calc(100% - var(--glass) * 18%),
+    transparent
+  );
+  backdrop-filter: blur(calc(10px + var(--glass) * 34px))
+    saturate(calc(100% + var(--glass) * 60%));
+}
+.toc-panel,
+.preferences,
+.book-menu {
+  background-color: color-mix(
+    in srgb,
+    var(--glass-tint) calc(100% - var(--glass) * 26%),
+    transparent
+  );
+}
+.modal-backdrop {
+  backdrop-filter: blur(calc(4px + var(--glass) * 6px));
 }

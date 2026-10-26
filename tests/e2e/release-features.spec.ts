@@ -11,13 +11,14 @@ async function openComic(page: Page) {
 }
 test("更新入口可关闭，浏览器预览不冒充可安装的桌面更新", async ({ page }) => {
   await page.goto("http://127.0.0.1:1420");
+  await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("button", { name: "软件更新", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "软件更新" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "设置" })).toBeVisible();
   await expect(page.getByText("请在 Windows 阅读器内检查更新。")).toBeVisible();
   await expect(
     page.getByRole("button", { name: "下载并重启更新" }),
   ).toHaveCount(0);
-  await page.getByLabel("关闭软件更新").click();
+  await page.getByLabel("关闭设置").click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
 });
 test("真实漫画快慢卷页时长有明显差异、保存设置且不影响上下阅读", async ({

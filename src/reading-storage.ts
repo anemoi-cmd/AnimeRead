@@ -172,6 +172,10 @@ export function loadMemory(): ReadingMemory {
         typeof appearance[key] === "string" && appearance[key].trim()
           ? appearance[key].trim().slice(0, 100)
           : DEFAULT_APPEARANCE[key];
+    const glass = Number(appearance.glass);
+    appearance.glass = Number.isFinite(glass)
+      ? Math.max(0, Math.min(1, glass))
+      : DEFAULT_APPEARANCE.glass;
     if (!/^#[0-9a-f]{6}$/i.test(appearance.customColor))
       appearance.customColor = DEFAULT_APPEARANCE.customColor;
     appearance.backgroundOpacity = Math.max(

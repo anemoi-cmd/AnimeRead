@@ -21,9 +21,7 @@ import {
   Search,
   FileText,
   Check,
-  Info,
-  Palette,
-  Download,
+  Settings,
 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type {
@@ -64,8 +62,8 @@ import { Preferences, type Ambience } from "./components/Preferences";
 import { Rain } from "./components/Rain";
 import { useRainSound } from "./ambience/reading-sounds";
 import { LibraryShelf } from "./components/LibraryShelf";
-import { Help } from "./components/Help";
-import { SoftwareUpdate } from "./components/SoftwareUpdate";
+import { SettingsCenter, type SettingsTab } from "./components/SettingsCenter";
+import { BrandMark } from "./components/BrandMark";
 import { ReaderProgress } from "./components/ReaderProgress";
 import { BookMenu } from "./components/BookMenu";
 import {
@@ -78,7 +76,6 @@ import {
   appearanceColor,
   type Appearance,
 } from "./appearance-settings";
-import { AppearanceSettings } from "./components/AppearanceSettings";
 import { GroupManager } from "./components/GroupManager";
 import { useReadingTime } from "./reading-time";
 import {
@@ -168,15 +165,15 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const [updatesOpen, setUpdatesOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<SettingsTab>();
   const [settings, setSettings] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
-  const [help, setHelp] = useState(false);
-  const [appearanceOpen, setAppearanceOpen] = useState(false);
   const [backgroundUrl, setBackgroundUrl] = useState<string>();
   const [groupId, setGroupId] = useState<string>();
   const [groupsOpen, setGroupsOpen] = useState(false);
+  // 从书籍右键菜单“加入分组”进入时预选的书。
+  const [groupBook, setGroupBook] = useState<ShelfBook>();
   const [filter, setFilter] = useState("");
   const [shelfMode, setShelfMode] = useState("all");
   const [ambience, setAmbience] = useState<Ambience>({
@@ -198,13 +195,7 @@ export default function App() {
   const queuedCount = useRef(0);
   const appliedStyle = useRef<ReaderStyle | undefined>(undefined);
   const enabled = useRef(false);
-  enabled.current =
-    !!active &&
-    !loading &&
-    !help &&
-    !appearanceOpen &&
-    !groupsOpen &&
-    !updatesOpen;
+  enabled.current = !!active && !loading && !settingsTab && !groupsOpen;
   const fail = useCallback((error: unknown) => {
     if ((error as Error)?.name !== "AbortError" && error !== "增强任务已取消")
       setError(messageOf(error));
@@ -216,14 +207,7 @@ export default function App() {
     return file ? new FileByteSource(file) : openNativeBook(book.id);
   }, []);
   useReadingTime(
-    active &&
-      !loading &&
-      !help &&
-      !appearanceOpen &&
-      !groupsOpen &&
-      !updatesOpen
-      ? active.id
-      : undefined,
+    active && !loading && !settingsTab && !groupsOpen ? active.id : undefined,
     (id, elapsed) => {
       const current = memoryRef.current;
       const next = {
@@ -300,6 +284,10 @@ export default function App() {
     document.documentElement.style.setProperty(
       "--theme-accent",
       appearanceColor(appearance),
+    );
+    document.documentElement.style.setProperty(
+      "--glass",
+      String(appearance.glass ?? DEFAULT_APPEARANCE.glass),
     );
   }, [appearance]);
   useEffect(() => {
@@ -806,7 +794,8 @@ export default function App() {
   }, [style]);
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {
-      if (updatesOpen) return;
+      // 设置中心自己处理键盘（含 Esc 关闭），正文不响应。
+      if (settingsTab) return;
       if (event.ctrlKey && event.key.toLowerCase() === "o") {
         event.preventDefault();
         void importBooks();
@@ -828,9 +817,7 @@ export default function App() {
         return;
       }
       if (event.key === "Escape") {
-        if (help) setHelp(false);
-        else if (appearanceOpen) setAppearanceOpen(false);
-        else if (groupsOpen) setGroupsOpen(false);
+        if (groupsOpen) setGroupsOpen(false);
         else if (settings) setSettings(false);
         else if (active) void back();
         return;
@@ -850,9 +837,7 @@ export default function App() {
     active,
     back,
     settings,
-    help,
-    updatesOpen,
-    appearanceOpen,
+    settingsTab,
     groupsOpen,
     fullscreen,
   ]);
@@ -946,7 +931,9 @@ export default function App() {
     );
   const visible = ordered.filter(
     (book) =>
-      (shelfMode === "all" ||
+      // 分组内展示整套书，不再按小说／漫画类别筛掉其中的卷。
+      (!!groupId ||
+        shelfMode === "all" ||
         (book.category ??
           (["txt", "epub", "pdf"].includes(book.format)
             ? "novel"
@@ -1014,7 +1001,7 @@ export default function App() {
       <aside className="sidebar">
         <button className="brand" onClick={() => void back()}>
           <span className="brand-icon">
-            <BookOpen size={22} />
+            <BrandMark size={40} />
           </span>
           <span>
             AnimeRead<small>让故事，慢慢发生</small>
@@ -1058,17 +1045,11 @@ export default function App() {
           <BookOpen size={18} /> 漫画
         </button>
         <div className="sidebar-bottom">
-          <button onClick={() => setUpdatesOpen(true)} className="sidebar-item">
-            <Download size={17} /> 软件更新
-          </button>
           <button
-            onClick={() => setAppearanceOpen(true)}
+            onClick={() => setSettingsTab("appearance")}
             className="sidebar-item"
           >
-            <Palette size={17} /> 外观设置
-          </button>
-          <button onClick={() => setHelp(true)} className="sidebar-item">
-            <Info size={17} /> 使用说明
+            <Settings size={17} /> 设置
           </button>
           <span className="version">AnimeRead {version}</span>
         </div>
@@ -1096,11 +1077,14 @@ export default function App() {
                 <span>我的书架</span>
                 <span className="breadcrumb-divider">/</span>
                 <strong>
-                  {shelfMode === "novel"
-                    ? "小说"
-                    : shelfMode === "comic"
-                      ? "漫画"
-                      : "全部书籍"}
+                  {(groupId &&
+                    memory.groups?.find((group) => group.id === groupId)
+                      ?.name) ||
+                    (shelfMode === "novel"
+                      ? "小说"
+                      : shelfMode === "comic"
+                        ? "漫画"
+                        : "全部书籍")}
                 </strong>
               </>
             )}
@@ -1350,11 +1334,17 @@ export default function App() {
           </button>
         </div>
       )}
-      {help && <Help close={() => setHelp(false)} />}
-      {updatesOpen && (
-        <SoftwareUpdate
-          close={() => setUpdatesOpen(false)}
-          prepare={async () => {
+      {settingsTab && (
+        <SettingsCenter
+          tab={settingsTab}
+          setTab={setSettingsTab}
+          close={() => setSettingsTab(undefined)}
+          appearance={{
+            value: appearance,
+            change: changeAppearance,
+            background,
+          }}
+          prepareUpdate={async () => {
             await back();
             // 阅读样式独立于书目状态；更新退出前必须保存最新样式，
             // 避免用 memory 中较早的 style 覆盖用户刚修改的主题或速度。
@@ -1367,16 +1357,12 @@ export default function App() {
           books={books}
           memory={memory}
           initialGroupId={groupId}
+          focusBook={groupBook}
           change={(groups) => setMemory((current) => ({ ...current, groups }))}
-          close={() => setGroupsOpen(false)}
-        />
-      )}
-      {appearanceOpen && (
-        <AppearanceSettings
-          value={appearance}
-          change={changeAppearance}
-          background={background}
-          close={() => setAppearanceOpen(false)}
+          close={() => {
+            setGroupsOpen(false);
+            setGroupBook(undefined);
+          }}
         />
       )}
       {contextBook && (
@@ -1385,9 +1371,14 @@ export default function App() {
           y={contextBook.y}
           close={() => setContextBook(undefined)}
           remove={() => void removeBook(contextBook.book)}
+          group={() => {
+            setGroupBook(contextBook.book);
+            setGroupsOpen(true);
+            setContextBook(undefined);
+          }}
           help={() => {
             setContextBook(undefined);
-            setHelp(true);
+            setSettingsTab("guide");
           }}
         />
       )}

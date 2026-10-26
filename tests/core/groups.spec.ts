@@ -71,3 +71,22 @@ test("五万卷与五百分组的归并保留全部成员且不重复", () => {
   expect(new Set(members).size).toBe(50000);
   expect(mapped[499].bookIds[99]).toBe("id49999");
 });
+test("未分组的同系列多卷生成建议，已有分组和单卷不建议", async () => {
+  const { suggestSeries, seriesTitle } = await import("../../src/book-groups");
+  expect(seriesTitle("星之旅人 第2卷.cbz")).toBe("星之旅人");
+  expect(seriesTitle("Blue Sky Vol.3.epub")).toBe("Blue Sky");
+  const books = [
+    { id: "a", name: "星之旅人 第1卷.cbz" },
+    { id: "b", name: "星之旅人 第2卷.cbz" },
+    { id: "c", name: "夏日回声.cbz" },
+    { id: "d", name: "北境之城 01.zip" },
+    { id: "e", name: "北境之城 02.zip" },
+  ];
+  expect(suggestSeries([], books)).toEqual([
+    { name: "星之旅人", ids: ["a", "b"] },
+    { name: "北境之城", ids: ["d", "e"] },
+  ]);
+  expect(
+    suggestSeries([{ id: "g", name: "北境之城", bookIds: [] }], books),
+  ).toEqual([{ name: "星之旅人", ids: ["a", "b"] }]);
+});

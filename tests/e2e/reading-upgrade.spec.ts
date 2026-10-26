@@ -70,7 +70,7 @@ test("读取真实封面、删除无用小字、主题背景持久化", async ({
   await expect(
     page.getByText("阅读进度与设置保存在本机", { exact: true }),
   ).toHaveCount(0);
-  await page.getByRole("button", { name: "外观设置", exact: true }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByLabel("海蓝主题").click();
   await expect
     .poll(() =>
@@ -100,7 +100,7 @@ test("读取真实封面、删除无用小字、主题背景持久化", async ({
   });
   await expect(page.locator(".app-shell")).toHaveClass(/has-wallpaper/);
   await page.getByLabel("背景壁纸浓度").fill("0.45");
-  await page.getByLabel("关闭外观设置").click();
+  await page.getByLabel("关闭设置").click();
   await expect
     .poll(() =>
       page.evaluate(
@@ -121,7 +121,7 @@ test("读取真实封面、删除无用小字、主题背景持久化", async ({
       ),
     )
     .toBe("#386c9a");
-  await page.getByRole("button", { name: "外观设置", exact: true }).click();
+  await page.getByRole("button", { name: "设置", exact: true }).click();
   await page.getByRole("button", { name: "移除壁纸", exact: true }).click();
   await expect(page.locator(".app-shell")).not.toHaveClass(/has-wallpaper/);
 });

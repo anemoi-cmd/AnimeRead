@@ -1,0 +1,72 @@
+import { useId } from "react";
+
+/** 应用图标：左页文字代表小说，右页分格代表漫画，金色星光是“发生的故事”。
+ * src-tauri/icons 中的程序图标由同一份图形渲染。
+ */
+export function BrandMark({ size = 38 }: { size?: number }) {
+  const id = `brand${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  return (
+    <svg
+      className="brand-mark"
+      width={size}
+      height={size}
+      viewBox="0 0 1024 1024"
+      aria-hidden="true"
+      dangerouslySetInnerHTML={{ __html: brandMarkSvg(id) }}
+    />
+  );
+}
+/** 图形内容（不含外层 svg）；id 前缀避免多处使用时渐变冲突。 */
+function brandMarkSvg(id = "brand") {
+  return `
+<defs>
+  <linearGradient id="${id}-bg" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#8cc3a4"/>
+    <stop offset="0.48" stop-color="#4f8a78"/>
+    <stop offset="1" stop-color="#23485a"/>
+  </linearGradient>
+  <radialGradient id="${id}-glow" cx="0.3" cy="0.12" r="0.75">
+    <stop offset="0" stop-color="#fff" stop-opacity="0.55"/>
+    <stop offset="0.55" stop-color="#fff" stop-opacity="0"/>
+  </radialGradient>
+  <linearGradient id="${id}-page" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#ffffff"/>
+    <stop offset="1" stop-color="#e8efe9"/>
+  </linearGradient>
+  <linearGradient id="${id}-spine" x1="0" y1="0" x2="1" y2="0">
+    <stop offset="0.38" stop-color="#1d3a45" stop-opacity="0"/>
+    <stop offset="0.5" stop-color="#1d3a45" stop-opacity="0.28"/>
+    <stop offset="0.62" stop-color="#1d3a45" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="${id}-star" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#fff2c4"/>
+    <stop offset="1" stop-color="#f3b84f"/>
+  </linearGradient>
+  <filter id="${id}-shadow" x="-20%" y="-20%" width="140%" height="150%">
+    <feDropShadow dx="0" dy="22" stdDeviation="26" flood-color="#0b2430" flood-opacity="0.35"/>
+  </filter>
+</defs>
+<rect x="40" y="40" width="944" height="944" rx="236" fill="url(#${id}-bg)"/>
+<rect x="40" y="40" width="944" height="944" rx="236" fill="url(#${id}-glow)"/>
+<rect x="42" y="42" width="940" height="940" rx="234" fill="none" stroke="#fff" stroke-opacity="0.35" stroke-width="4"/>
+<g filter="url(#${id}-shadow)">
+  <path d="M512 420 C432 368 318 356 214 380 L214 742 C318 718 432 728 512 780 Z" fill="url(#${id}-page)"/>
+  <path d="M512 420 C592 368 706 356 810 380 L810 742 C706 718 592 728 512 780 Z" fill="url(#${id}-page)"/>
+  <path d="M214 380 L512 420 L810 380 L810 742 L512 780 L214 742 Z" fill="url(#${id}-spine)"/>
+</g>
+<g stroke="#4f8a78" stroke-opacity="0.55" stroke-width="18" stroke-linecap="round" fill="none">
+  <path d="M272 470 C340 458 404 462 456 482"/>
+  <path d="M272 530 C340 518 404 522 456 542"/>
+  <path d="M272 590 C340 578 404 582 456 602"/>
+  <path d="M272 650 C320 642 360 644 400 654"/>
+</g>
+<g fill="#23485a" fill-opacity="0.78">
+  <path d="M570 470 C620 448 690 440 752 446 L752 548 C690 543 624 550 570 570 Z"/>
+  <path d="M570 600 C600 588 630 582 650 580 L650 690 C628 692 600 698 570 710 Z"/>
+  <path d="M676 578 C700 576 728 576 752 578 L752 676 C728 674 700 675 676 678 Z"/>
+</g>
+<path d="M512 150 C524 228 548 252 626 264 C548 276 524 300 512 378 C500 300 476 276 398 264 C476 252 500 228 512 150 Z" fill="url(#${id}-star)"/>
+<circle cx="700" cy="196" r="22" fill="#fff2c4" fill-opacity="0.9"/>
+<circle cx="330" cy="240" r="14" fill="#fff2c4" fill-opacity="0.7"/>
+`;
+}

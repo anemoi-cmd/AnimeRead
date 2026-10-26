@@ -14,6 +14,8 @@ export interface Appearance {
   backgroundKind: "image" | "video";
   welcomeTitle: string;
   welcomeSubtitle: string;
+  /** 液态玻璃强度，0 为不透明平面，1 为最通透。 */
+  glass: number;
 }
 export const DEFAULT_APPEARANCE: Appearance = {
   palette: "sage",
@@ -23,6 +25,7 @@ export const DEFAULT_APPEARANCE: Appearance = {
   backgroundKind: "image",
   welcomeTitle: "给阅读，留一点时间。",
   welcomeSubtitle: "翻开一页，让世界安静下来。",
+  glass: 0.6,
 };
 export function appearanceColor(appearance: Appearance) {
   return (
