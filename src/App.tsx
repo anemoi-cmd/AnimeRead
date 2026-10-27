@@ -1247,8 +1247,9 @@ export default function App() {
               ) : (
                 snapshot?.enhancement && (
                   <span>
-                    {snapshot.enhancement.filters} ·{" "}
-                    {snapshot.enhancement.scale}×
+                    {snapshot.enhancement.skipped
+                      ? "原图已足够清晰，无需超分"
+                      : `${snapshot.enhancement.filters} · ${snapshot.enhancement.scale}×`}
                   </span>
                 )
               )}

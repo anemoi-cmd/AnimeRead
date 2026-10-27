@@ -32,15 +32,13 @@ function getWorker() {
     releaseAnime4k(new Error(event.message || "Anime4K 后台处理失败"));
   return worker;
 }
+/** 位图所有权转交给 Worker；调用后不要再使用 bitmap。 */
 export async function anime4kImage(
-  source: Blob,
+  bitmap: ImageBitmap,
   filters: FilterMode[],
   target: EnhanceTarget | undefined,
   signal?: AbortSignal,
 ): Promise<Output> {
-  signal?.throwIfAborted();
-  // 直接从压缩数据解码，避免在主线程再画一遍已解码的图片。
-  const bitmap = await createImageBitmap(source);
   if (signal?.aborted) {
     bitmap.close();
     signal.throwIfAborted();

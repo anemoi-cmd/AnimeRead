@@ -9,13 +9,19 @@ import { invoke } from "@tauri-apps/api/core";
 import { anime4kDevice, enhanceImage } from "../image-enhancement";
 import type { BookArchive } from "./book-archive";
 import { warmAnime4k } from "../gpu/anime4k-client";
-import type { EnhanceTarget } from "../gpu/output-size";
+import {
+  fitRatio,
+  neededFilters,
+  type EnhanceTarget,
+} from "../gpu/output-size";
 
 type Enhancement = NonNullable<ReaderSnapshot["enhancement"]>;
-type Enhanced = { bitmap: ImageBitmap; enhancement: Enhancement };
+// 原图已足够清晰时只记录结论，没有位图，也不占缓存预算。
+type Enhanced = { bitmap?: ImageBitmap; enhancement: Enhancement };
 const ORIGINAL_BUDGET = 48 * 1024 * 1024;
 const ENHANCED_BUDGET = 192 * 1024 * 1024;
-const bitmapBytes = (bitmap: ImageBitmap) => bitmap.width * bitmap.height * 4;
+const bitmapBytes = (bitmap?: ImageBitmap) =>
+  bitmap ? bitmap.width * bitmap.height * 4 : 0;
 /** 漫画页面节点：原图为 img，增强图为同尺寸显示的 canvas。 */
 export type PageImage = HTMLImageElement | HTMLCanvasElement;
 
@@ -60,12 +66,15 @@ export class ImagePages {
   async load(
     index: number,
     style: ReaderStyle,
-  ): Promise<{ image: PageImage; enhancement?: Enhancement }> {
+  ): Promise<{ image?: PageImage; enhancement?: Enhancement }> {
     if (!style.enhanceEnabled) return { image: await this.loadOriginal(index) };
     let data = await this.loadEnhanced(index, style);
     // 极大页面可能在交付前被并发预处理挤出缓存（已关闭的位图宽度为 0）。
-    if (!data.bitmap.width) data = await this.loadEnhanced(index, style);
+    if (data.bitmap && !data.bitmap.width)
+      data = await this.loadEnhanced(index, style);
     if (this.disposed) throw new Error("书籍已关闭");
+    // 不需要增强：保留页面上的原图，只更新状态。
+    if (!data.bitmap) return { enhancement: data.enhancement };
     // 立即复制到显示画布：缓存随后淘汰并关闭位图也不影响页面。
     const canvas = document.createElement("canvas");
     canvas.width = data.bitmap.width;
@@ -89,12 +98,19 @@ export class ImagePages {
   hasEnhanced(index: number, style: ReaderStyle) {
     return style.enhanceEnabled && this.enhanced.has(this.key(index, style));
   }
-  /** 打开漫画或更换滤镜时预编译 Anime4K 模型，读者看原图时同步完成。 */
-  warm(style: ReaderStyle) {
+  /** 打开漫画或更换滤镜时预编译 Anime4K 模型，读者看原图时同步完成。
+   * 先看当前页是否真的需要放大；原图已够清晰的书不唤醒显卡。
+   */
+  warm(style: ReaderStyle, index: number) {
     if (!style.enhanceEnabled || style.enhanceBackend !== "anime4k") return;
-    void anime4kDevice().then((device) => {
-      if (device && !this.disposed) warmAnime4k(style.filters);
-    });
+    void (async () => {
+      const bitmap = await createImageBitmap(await this.original(index));
+      const fit = fitRatio(bitmap.width, bitmap.height, this.target());
+      bitmap.close();
+      const filters = neededFilters(style.filters, fit);
+      if (filters.length && !this.disposed && (await anime4kDevice()))
+        warmAnime4k(filters);
+    })().catch(() => {});
   }
   async prefetch(indices: number[], style: ReaderStyle) {
     const signal = this.controller.signal;
@@ -179,7 +195,7 @@ export class ImagePages {
     if (!value) return;
     this.enhancedBytes -= bitmapBytes(value.bitmap);
     this.enhanced.delete(key);
-    value.bitmap.close();
+    value.bitmap?.close();
   }
   private async enhance(
     index: number,
@@ -191,6 +207,17 @@ export class ImagePages {
     const started = performance.now();
     signal.throwIfAborted();
     const enhanced = await enhanceImage(original, style, this.target(), signal);
+    if (enhanced.skipped) {
+      signal.throwIfAborted();
+      return {
+        enhancement: {
+          scale: 1,
+          filters: style.filters.join("+"),
+          milliseconds: Math.round(performance.now() - started),
+          skipped: true,
+        },
+      };
+    }
     if (signal.aborted) {
       enhanced.bitmap.close();
       signal.throwIfAborted();
@@ -199,7 +226,7 @@ export class ImagePages {
       bitmap: enhanced.bitmap,
       enhancement: {
         scale: Math.round(enhanced.scale * 100) / 100,
-        filters: style.filters.join("+"),
+        filters: enhanced.filters.join("+"),
         device: enhanced.device,
         milliseconds: Math.round(performance.now() - started),
       },

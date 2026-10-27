@@ -108,8 +108,10 @@ export class ComicPdfReader implements ReaderEngine {
     this.frames.set(frame.element, frame);
     if (this.images?.hasEnhanced(index, this.style)) {
       const cached = await this.images.load(index, this.style);
-      cached.image.dataset.page = String(index);
-      frame.enhance(cached.image, this.style.compare, cached.enhancement);
+      if (cached.image) {
+        cached.image.dataset.page = String(index);
+        frame.enhance(cached.image, this.style.compare, cached.enhancement);
+      } else frame.keepOriginal(cached.enhancement);
     }
     return frame.element;
   }
@@ -214,7 +216,7 @@ export class ComicPdfReader implements ReaderEngine {
       this.images = new ImagePages(this.source, this.names, this.archive, () =>
         this.enhanceTarget(),
       );
-      this.images.warm(this.style);
+      this.images.warm(this.style, this.page);
     }
     await this.render();
     this.observer = new ResizeObserver(() => {
@@ -444,10 +446,15 @@ export class ComicPdfReader implements ReaderEngine {
             !target.isConnected
           )
             return;
-          loaded.image.dataset.page = String(index);
-          this.frames
-            .get(target)
-            ?.enhance(loaded.image, this.style.compare, loaded.enhancement);
+          const frame = this.frames.get(target);
+          if (loaded.image) {
+            loaded.image.dataset.page = String(index);
+            frame?.enhance(
+              loaded.image,
+              this.style.compare,
+              loaded.enhancement,
+            );
+          } else frame?.keepOriginal(loaded.enhancement);
           this.snapshot.enhancement = loaded.enhancement;
         }),
       );
@@ -676,7 +683,7 @@ export class ComicPdfReader implements ReaderEngine {
       pipelineChanged
     ) {
       await this.cancelPending();
-      if (pipelineChanged) this.images?.warm(style);
+      if (pipelineChanged) this.images?.warm(style, this.page);
       this.vertical?.dispose();
       this.vertical = undefined;
       this.enhancingPage = undefined;

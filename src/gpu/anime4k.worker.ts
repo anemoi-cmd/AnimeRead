@@ -76,7 +76,8 @@ async function warm(filters: FilterMode[]) {
     const gpu = await device();
     // 正在处理的页面持有当前管线，不能被预热替换。
     if (valid(filters) && active === undefined && !queued.length) {
-      createGraph(gpu, filters);
+      // 典型需要放大的页面约 100 万像素。
+      createGraph(gpu, filters, 1_000_000);
       shaders ??= createShaders(gpu);
     }
   } catch {
@@ -86,13 +87,14 @@ async function warm(filters: FilterMode[]) {
 }
 function scheduleIdle() {
   clearTimeout(idle);
-  // 闲置三分钟释放显存；连续换书时保留已编译的模型。
+  // 闲置 90 秒释放显卡设备，让笔记本独显尽快回到空闲状态；连续翻页
+  // 或换书时仍复用已编译的模型。
   idle = setTimeout(() => {
     disposeGraph();
     shaders = undefined;
     gpu?.destroy();
     gpu = undefined;
-  }, 180_000);
+  }, 90_000);
 }
 
 function check(id: number) {
@@ -127,12 +129,23 @@ async function device() {
   });
   return gpu;
 }
-/** 独显使用最大模型 UL；核显等共享显存设备使用 VL，避免显存不足。 */
-function largeModel() {
+/** 每一遍 2× 选用的模型。UL 画质最好但算量约为 VL 的三倍：只在 NVIDIA
+ * 独显上、且这一遍的输入不超过约 200 万像素时使用；更大的输入或其他
+ * 显卡用 VL，避免整页长时间满载（笔记本显卡风扇轰鸣）。按需规划后，
+ * 需要放大的页面本身就小于屏幕，大多数情况仍能用上 UL。
+ */
+function upscaleModels(filters: FilterMode[], pixels: number) {
   const info = adapter?.info;
-  return /nvidia|geforce|rtx|quadro/i.test(
+  const nvidia = /nvidia|geforce|rtx|quadro/i.test(
     `${info?.vendor ?? ""} ${info?.description ?? ""}`,
   );
+  let stage = pixels;
+  return filters.map((mode) => {
+    if (mode !== "A") return mode;
+    const model = nvidia && stage <= 2_000_000 ? "UL" : "VL";
+    stage *= 4;
+    return model;
+  });
 }
 
 const FULLSCREEN = /* wgsl */ `
@@ -249,9 +262,9 @@ function createShaders(gpu: GPUDevice) {
   return { extract, compose, resample, sampler };
 }
 
-function createGraph(gpu: GPUDevice, filters: FilterMode[]) {
-  const large = largeModel();
-  const key = `${filters.join("+")}:${large ? "UL" : "VL"}`;
+function createGraph(gpu: GPUDevice, filters: FilterMode[], pixels: number) {
+  const models = upscaleModels(filters, pixels);
+  const key = models.join("+");
   if (graph?.key === key) return graph;
   disposeGraph();
   const scale = 2 ** filters.filter((mode) => mode === "A").length;
@@ -287,7 +300,7 @@ function createGraph(gpu: GPUDevice, filters: FilterMode[]) {
     let texture = source;
     const guard = createTextureGuard(proxy, source);
     const pipelines: Anime4KPipeline[] = [];
-    for (const mode of filters) {
+    for (const [index, mode] of filters.entries()) {
       let pipeline: Anime4KPipeline;
       if (mode === "C") {
         const denoise = new BilateralMean({
@@ -298,9 +311,10 @@ function createGraph(gpu: GPUDevice, filters: FilterMode[]) {
         denoise.updateParam("strength2", 2);
         pipeline = denoise;
       } else if (mode === "A")
-        pipeline = large
-          ? new CNNx2UL({ device: proxy, inputTexture: texture })
-          : new CNNx2VL({ device: proxy, inputTexture: texture });
+        pipeline =
+          models[index] === "UL"
+            ? new CNNx2UL({ device: proxy, inputTexture: texture })
+            : new CNNx2VL({ device: proxy, inputTexture: texture });
       else pipeline = new CNNSoftVL({ device: proxy, inputTexture: texture });
       pipelines.push(pipeline);
       texture = pipeline.getOutputTexture();
@@ -344,7 +358,7 @@ async function process(job: Job) {
   gpu.pushErrorScope("out-of-memory");
   gpu.pushErrorScope("validation");
   try {
-    const g = createGraph(gpu, filters);
+    const g = createGraph(gpu, filters, bitmap.width * bitmap.height);
     shaders ??= createShaders(gpu);
     const image = gpu.createTexture({
       size: [bitmap.width, bitmap.height],

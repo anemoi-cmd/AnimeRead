@@ -27,3 +27,23 @@ test("超分输出按屏幕需要放大，不超过模型倍率也不小于原�
   // 没有目标时按完整倍率。
   expect(enhancedSize(10, 20, 2)).toEqual({ width: 20, height: 40 });
 });
+
+test("按屏幕需要规划放大遍数，原图够大时不调用放大模型", async () => {
+  const { neededFilters, fitRatio } = await import("../../src/gpu/output-size");
+  const screen = { width: 1920, height: 1080 };
+  // 现代扫描图比屏幕大：不放大；只选了 A 时不做任何处理。
+  expect(neededFilters(["A"], fitRatio(2400, 3600, screen))).toEqual([]);
+  expect(neededFilters(["C", "A"], fitRatio(2400, 3600, screen))).toEqual([
+    "C",
+  ]);
+  // 只差一点（不足 10%）也不放大。
+  expect(neededFilters(["A"], fitRatio(1000, 1000, screen))).toEqual([]);
+  // 需要 1.1–2.2 倍：一遍；更小的旧图：两遍，最多四倍。
+  expect(neededFilters(["A"], fitRatio(400, 700, screen))).toEqual(["A"]);
+  expect(neededFilters(["A"], fitRatio(300, 420, screen))).toEqual(["A", "A"]);
+  expect(neededFilters(["C", "A", "B"], 3)).toEqual(["C", "A", "A", "B"]);
+  expect(neededFilters(["A", "A"], 1.5)).toEqual(["A"]);
+  // 没有选 A 时不会凭空加入放大。
+  expect(neededFilters(["B"], 4)).toEqual(["B"]);
+  expect(fitRatio(100, 100)).toBe(Number.POSITIVE_INFINITY);
+});

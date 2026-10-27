@@ -85,6 +85,8 @@ export interface ReaderSnapshot {
     milliseconds: number;
     filters: string;
     device?: string;
+    /** 原图已不小于显示尺寸，未调用显卡。 */
+    skipped?: boolean;
   };
 }
 export interface ReaderEngine {

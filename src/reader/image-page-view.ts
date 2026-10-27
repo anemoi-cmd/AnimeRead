@@ -80,6 +80,10 @@ export class ImageFrame {
     this.element.insertBefore(image, this.labels);
     this.compare(compare);
   }
+  /** 原图已足够清晰：记录结论，页面继续显示原图。 */
+  keepOriginal(enhancement?: ReaderSnapshot["enhancement"]) {
+    this.enhancement = enhancement;
+  }
   compare(enabled: boolean) {
     const visible = enabled && !!this.enhanced;
     this.element.classList.toggle("is-comparing", visible);

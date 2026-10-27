@@ -2413,7 +2413,7 @@ kbd {
     var(--glass-tint) calc(100% - var(--glass) * 50%),
     transparent
   );
-  backdrop-filter: blur(calc(var(--glass) * 30px))
+  backdrop-filter: blur(calc(var(--glass) * 20px))
     saturate(calc(100% + var(--glass) * 80%));
   border-color: color-mix(
     in srgb,
@@ -2506,7 +2506,7 @@ kbd {
     var(--glass-tint) calc(100% - var(--glass) * 18%),
     transparent
   );
-  backdrop-filter: blur(calc(10px + var(--glass) * 34px))
+  backdrop-filter: blur(calc(8px + var(--glass) * 16px))
     saturate(calc(100% + var(--glass) * 60%));
 }
 .toc-panel,
