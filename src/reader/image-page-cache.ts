@@ -275,6 +275,10 @@ export class ImagePages {
       },
     };
   }
+  /** 缩略图用：已缓存就直接用，否则只读取不放进阅读缓存，避免挤掉正在读的页。 */
+  async sourceBlob(index: number) {
+    return this.originals.get(index) ?? this.read(index);
+  }
   private async read(index: number) {
     const bytes = this.archive
       ? await this.archive.read(this.names[index])

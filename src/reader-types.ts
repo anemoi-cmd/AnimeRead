@@ -104,6 +104,8 @@ export interface ReaderEngine {
   /** 窗口／面板尺寸改变后重新布局，保留当前阅读位置。 */
   resize(): Promise<void>;
   cancelPending?(): Promise<void>;
+  /** 固定页面书籍的页面缩略图（对象 URL）；可重排的小说没有。 */
+  thumbnail?(index: number): Promise<string>;
   dispose(): Promise<void>;
 }
 export const DEFAULT_STYLE: ReaderStyle = {

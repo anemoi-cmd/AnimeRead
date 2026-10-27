@@ -22,6 +22,7 @@ import {
   FileText,
   Check,
   Settings,
+  LayoutGrid,
 } from "lucide-react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import type {
@@ -64,6 +65,7 @@ import { useRainSound } from "./ambience/reading-sounds";
 import { LibraryShelf } from "./components/LibraryShelf";
 import { SettingsCenter, type SettingsTab } from "./components/SettingsCenter";
 import { BrandMark } from "./components/BrandMark";
+import { ThumbnailGrid } from "./components/ThumbnailGrid";
 import { ReaderProgress } from "./components/ReaderProgress";
 import { BookMenu } from "./components/BookMenu";
 import {
@@ -168,6 +170,7 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState<SettingsTab>();
   const [settings, setSettings] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
+  const [gridOpen, setGridOpen] = useState(false);
   const [bookmarksOpen, setBookmarksOpen] = useState(false);
   const [backgroundUrl, setBackgroundUrl] = useState<string>();
   const [groupId, setGroupId] = useState<string>();
@@ -195,7 +198,8 @@ export default function App() {
   const queuedCount = useRef(0);
   const appliedStyle = useRef<ReaderStyle | undefined>(undefined);
   const enabled = useRef(false);
-  enabled.current = !!active && !loading && !settingsTab && !groupsOpen;
+  enabled.current =
+    !!active && !loading && !settingsTab && !groupsOpen && !gridOpen;
   const fail = useCallback((error: unknown) => {
     if ((error as Error)?.name !== "AbortError" && error !== "增强任务已取消")
       setError(messageOf(error));
@@ -366,6 +370,7 @@ export default function App() {
         if (host) host.dataset.relayout = "";
         setSettings(false);
         setTocOpen(false);
+        setGridOpen(false);
         setBookmarksOpen(false);
         setImmersive(value);
         const command = native
@@ -447,6 +452,7 @@ export default function App() {
           setNotice("");
           setSettings(false);
           setBookmarksOpen(false);
+          setGridOpen(false);
           const previous = engine.current;
           engine.current = undefined;
           try {
@@ -635,6 +641,7 @@ export default function App() {
         const previous = engine.current;
         engine.current = undefined;
         setSettings(false);
+        setGridOpen(false);
         setError("");
         try {
           await previous?.cancelPending?.();
@@ -817,7 +824,8 @@ export default function App() {
         return;
       }
       if (event.key === "Escape") {
-        if (groupsOpen) setGroupsOpen(false);
+        if (gridOpen) setGridOpen(false);
+        else if (groupsOpen) setGroupsOpen(false);
         else if (settings) setSettings(false);
         else if (active) void back();
         return;
@@ -839,6 +847,7 @@ export default function App() {
     settings,
     settingsTab,
     groupsOpen,
+    gridOpen,
     fullscreen,
   ]);
   useEffect(() => {
@@ -904,6 +913,12 @@ export default function App() {
       },
     }));
   };
+  const pageThumbnail = useCallback(
+    (index: number) =>
+      engine.current?.thumbnail?.(index) ??
+      Promise.reject(new Error("这本书没有页面缩略图")),
+    [],
+  );
   const seek = (progress: number) => {
     pendingSeek.current = progress;
     if (seeking.current || !ready.current) return;
@@ -922,6 +937,8 @@ export default function App() {
     if (!queued) seeking.current = false;
   };
   const colors = THEME_COLORS[style.theme];
+  // 漫画和 PDF 这类按页排版的书才有页面缩略图。
+  const pagedBook = !!snapshot?.pages && snapshot.reflow === false;
   const ordered = books
     .slice()
     .sort(
@@ -1102,6 +1119,19 @@ export default function App() {
                 >
                   <List size={19} />
                 </button>
+                {pagedBook && (
+                  <button
+                    className={`icon-button ${gridOpen ? "pressed" : ""}`}
+                    aria-label="页面缩略图"
+                    onClick={() => {
+                      setGridOpen(!gridOpen);
+                      setTocOpen(false);
+                      setBookmarksOpen(false);
+                    }}
+                  >
+                    <LayoutGrid size={18} />
+                  </button>
+                )}
                 <button
                   className="icon-button"
                   aria-label="添加书签"
@@ -1239,6 +1269,19 @@ export default function App() {
               </div>
             </aside>
           )}
+          {gridOpen && pagedBook && snapshot?.pages && (
+            <ThumbnailGrid
+              pages={snapshot.pages}
+              current={[(snapshot.page ?? 1) - 1]}
+              thumbnail={pageThumbnail}
+              go={(index) => {
+                setGridOpen(false);
+                run((reader) => reader.goTo(index));
+                surface.current?.focus({ preventScroll: true });
+              }}
+              close={() => setGridOpen(false)}
+            />
+          )}
           <div className="reader-center">
             <div className="reading-heading">
               <span>{snapshot?.chapter || "正在打开书籍"}</span>
@@ -1284,7 +1327,11 @@ export default function App() {
                   <ArrowRight size={18} />
                 )}
               </button>
-              <ReaderProgress snapshot={snapshot} seek={seek} />
+              <ReaderProgress
+                snapshot={snapshot}
+                seek={seek}
+                thumbnail={pagedBook ? pageThumbnail : undefined}
+              />
               <button
                 className="icon-button"
                 aria-label="下一页"

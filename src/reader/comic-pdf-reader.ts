@@ -23,6 +23,7 @@ import { ImagePages } from "./image-page-cache";
 import { VerticalPages } from "./comic-scroll-reader";
 import { ImageFrame } from "./image-page-view";
 import { pageViews, type ViewRect } from "./page-crop";
+import { ThumbnailStore, THUMBNAIL_HEIGHT, imageThumbnail } from "./thumbnails";
 import { spreadPages, turnPage } from "./spread-layout";
 import type { ComicEpub } from "./epub-inspection";
 import { BookArchive } from "./book-archive";
@@ -102,6 +103,7 @@ export class ComicPdfReader implements ReaderEngine {
   private resizePending = false;
   private resizeQueue = Promise.resolve();
   private layoutViewport?: ReturnType<ComicPdfReader["viewport"]>;
+  private thumbnails = new ThumbnailStore((index) => this.drawThumbnail(index));
   // 每页的显示区域（裁白边、拆分宽页），按设置组合缓存；同步副本供翻页判断。
   private views = new Map<string, Promise<ViewRect[]>>();
   private resolvedViews = new Map<string, ViewRect[]>();
@@ -758,6 +760,32 @@ export class ComicPdfReader implements ReaderEngine {
   async previous(gesture?: TurnGesture) {
     await this.turn(-1, gesture);
   }
+  /** 页面缩略图（对象 URL），由本阅读器持有并在关书时释放。 */
+  thumbnail(index: number) {
+    return this.thumbnails.get(Math.max(0, Math.min(this.pages - 1, index)));
+  }
+  private async drawThumbnail(index: number) {
+    if (this.images) return imageThumbnail(await this.images.sourceBlob(index));
+    if (!this.pdf) throw new Error("没有可用的页面");
+    const page = await this.pdf.getPage(index + 1);
+    const base = page.getViewport({ scale: 1 });
+    const viewport = page.getViewport({
+      scale: THUMBNAIL_HEIGHT / base.height,
+    });
+    const canvas = new OffscreenCanvas(
+      Math.ceil(viewport.width),
+      Math.ceil(viewport.height),
+    );
+    const context = canvas.getContext("2d")!;
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    await page.render({
+      canvas: canvas as unknown as HTMLCanvasElement,
+      canvasContext: context as unknown as CanvasRenderingContext2D,
+      viewport,
+    }).promise;
+    return canvas;
+  }
   async cancelPending() {
     this.generation++;
     await this.images?.cancelPending();
@@ -816,6 +844,7 @@ export class ComicPdfReader implements ReaderEngine {
     this.renderTasks.forEach((task) => task.cancel());
     this.textLayers.forEach((layer) => layer.cancel());
     this.vertical?.dispose();
+    this.thumbnails.dispose();
     await this.images?.dispose();
     await this.pdfTask?.destroy();
     await this.archive?.close();

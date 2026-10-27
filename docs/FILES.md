@@ -68,6 +68,7 @@
 | components/Help.tsx | 使用说明页，内容来自面向用户的 USER_GUIDE.md |
 | components/SoftwareUpdate.tsx | 软件更新页：检查、下载进度与升级 |
 | components/Rain.tsx | 雨景画布与动画生命周期 |
+| components/ThumbnailGrid.tsx | 全书页面缩略图面板，滚动到附近才加载 |
 | ambience/rain-field.ts | 有界雨丝、水滴、滑落与尾迹 |
 | ambience/reading-sounds.ts | 雨声与翻书录音共用解码缓存和 AudioContext，雨声交叉淡入淡出 |
 | gpu/anime4k-client.ts | 管理增强 Worker、任务与取消 |
@@ -83,6 +84,7 @@
 | reader/image-page-cache.ts | 原图压缩缓存、增强位图缓存、加载与取消 |
 | reader/image-page-view.ts | 固定原图尺寸和可拖动画质对比 |
 | reader/page-crop.ts | 白边检测、跨页拆分，给出每页的显示区域 |
+| reader/thumbnails.ts | 页面缩略图的按需生成、并发限制与释放 |
 | reader/comic-scroll-reader.ts | 最多五页的漫画上下阅读、拖动与页顶对齐 |
 | reader/spread-layout.ts | 双页分组、封面与翻页步长 |
 | reader/page-transitions.ts | 共用翻页事务、包含留白的页面快照、准备遮罩、书脊卷页、滑动过渡 |
