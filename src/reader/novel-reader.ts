@@ -267,6 +267,7 @@ export class NovelReader implements ReaderEngine {
           host,
           () => this.style.motion === "curl" && this.style.direction !== "ttb",
           this.scrollInput(),
+          () => this.style.direction !== "ttb",
         ),
       );
       void doc.fonts.ready.then(() => {
@@ -328,6 +329,7 @@ export class NovelReader implements ReaderEngine {
       host,
       () => this.style.motion === "curl" && this.style.direction !== "ttb",
       this.scrollInput(),
+      () => this.style.direction !== "ttb",
     );
     await this.view.open(this.book);
     await this.applyStyle();

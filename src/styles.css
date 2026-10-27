@@ -2071,10 +2071,11 @@ kbd {
   overflow: hidden;
   z-index: 8;
 }
+/* 翻动中的纸张与静态页面一致，不加投影：双页时左右两张的投影会在
+   中缝叠成一条只在翻页时出现的“书脊”。立体感只来自卷页引擎的折痕阴影。 */
 .curl-sheet {
   font-synthesis: weight style;
   overflow: hidden;
-  box-shadow: 0 3px 14px #0002;
   background: var(--curl-background);
 }
 .is-immersive .sidebar,

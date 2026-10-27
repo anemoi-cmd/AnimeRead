@@ -59,8 +59,29 @@ scope.onmessage = ({ data }) => {
   } else if (data.type === "warm") {
     clearTimeout(idle);
     void warm(data.filters);
+  } else if (data.type === "pause") {
+    if (data.paused) {
+      paused = true;
+      // 主线程若未能发出恢复消息，最多暂停 3 秒，避免任务永久挂起。
+      clearTimeout(pauseTimer);
+      pauseTimer = setTimeout(resume, 3000);
+    } else resume();
   }
 };
+// 翻页动画与推理共用显卡。动画期间在块之间暂停，保证卷页流畅；
+// 动画结束立即继续。
+let paused = false;
+let pauseTimer: ReturnType<typeof setTimeout> | undefined;
+const waiting: (() => void)[] = [];
+function resume() {
+  paused = false;
+  clearTimeout(pauseTimer);
+  for (const wake of waiting.splice(0)) wake();
+}
+async function yieldToPageTurn(id: number) {
+  while (paused) await new Promise<void>((wake) => waiting.push(wake));
+  check(id);
+}
 function valid(filters: FilterMode[]) {
   return (
     filters.length > 0 &&
@@ -269,7 +290,10 @@ function createGraph(gpu: GPUDevice, filters: FilterMode[], pixels: number) {
   disposeGraph();
   const scale = 2 ** filters.filter((mode) => mode === "A").length;
   // 块越大重叠区占比越低；每次 2× 后中间纹理按面积增长，所以按倍率收缩。
-  const side = Math.max(256, Math.min(1024, Math.floor(2048 / scale)));
+  // 每块是一次显卡提交，提交越短界面合成越能穿插进来。UL 算量约为 VL
+  // 的三倍，用较小的块（重叠计算约多 8%），换取翻页与滚动不掉帧。
+  const limit = models.includes("UL") ? 640 : 1024;
+  const side = Math.max(256, Math.min(limit, Math.floor(2048 / scale)));
   const core = side - HALO * 2;
   const resources: (GPUTexture | GPUBuffer)[] = [];
   const proxy = new Proxy(gpu, {
@@ -402,7 +426,7 @@ async function process(job: Job) {
       resultView = result.createView();
     for (let y = 0; y < bitmap.height; y += g.core)
       for (let x = 0; x < bitmap.width; x += g.core) {
-        check(id);
+        await yieldToPageTurn(id);
         // 每块单独提交：writeBuffer 与提交按队列顺序执行，块参数不会串用。
         gpu.queue.writeBuffer(
           g.uniform,

@@ -84,6 +84,10 @@ export function warmAnime4k(filters: FilterMode[]) {
     // Worker 无法创建时，处理页面会走正常的错误提示。
   }
 }
+/** 翻页动画期间暂停推理；Worker 尚未启动时无需通知。 */
+export function pauseAnime4k(paused: boolean) {
+  worker?.postMessage({ type: "pause", paused });
+}
 function releaseAnime4k(
   error: Error = new DOMException("增强已取消", "AbortError"),
 ) {

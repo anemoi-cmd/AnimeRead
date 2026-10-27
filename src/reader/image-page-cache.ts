@@ -8,7 +8,7 @@ import { native, readWhole } from "../file-sources";
 import { invoke } from "@tauri-apps/api/core";
 import { anime4kDevice, enhanceImage } from "../image-enhancement";
 import type { BookArchive } from "./book-archive";
-import { warmAnime4k } from "../gpu/anime4k-client";
+import { pauseAnime4k, warmAnime4k } from "../gpu/anime4k-client";
 import {
   fitRatio,
   neededFilters,
@@ -60,8 +60,30 @@ export class ImagePages {
       URL.revokeObjectURL(url);
     }
   }
+  // 相邻页面提前解码好的原图；一个元素只能放进页面一次，取用即移除。
+  private decoded = new Map<number, Promise<HTMLImageElement>>();
   async loadOriginal(index: number) {
+    const ready = this.decoded.get(index);
+    if (ready) {
+      this.decoded.delete(index);
+      return ready;
+    }
     return this.decode(await this.original(index), index);
+  }
+  /** 阅读当前页时预先读取并解码前后页面，翻页时直接换上，不等解码。
+   * 最多保留 4 张，超出的最旧一张丢弃。
+   */
+  preload(indices: number[]) {
+    for (const index of indices) {
+      if (this.disposed || this.decoded.has(index)) continue;
+      const image = this.original(index).then((blob) =>
+        this.decode(blob, index),
+      );
+      image.catch(() => this.decoded.delete(index));
+      this.decoded.set(index, image);
+    }
+    while (this.decoded.size > 4)
+      this.decoded.delete(this.decoded.keys().next().value!);
   }
   async load(
     index: number,
@@ -111,6 +133,21 @@ export class ImagePages {
       if (filters.length && !this.disposed && (await anime4kDevice()))
         warmAnime4k(filters);
     })().catch(() => {});
+  }
+  private turnGate?: { done: Promise<void>; open: () => void };
+  /** 翻页动画与推理共用显卡：动画期间新任务等动画结束再开始，正在跑的
+   * Anime4K 任务在块之间暂停。Waifu2x 是独立进程，只能推迟开始。
+   */
+  pause(paused: boolean) {
+    pauseAnime4k(paused);
+    if (paused && !this.turnGate) {
+      let open!: () => void;
+      const done = new Promise<void>((resolve) => (open = resolve));
+      this.turnGate = { done, open };
+    } else if (!paused && this.turnGate) {
+      this.turnGate.open();
+      this.turnGate = undefined;
+    }
   }
   async prefetch(indices: number[], style: ReaderStyle) {
     const signal = this.controller.signal;
@@ -204,6 +241,7 @@ export class ImagePages {
   ): Promise<Enhanced> {
     signal.throwIfAborted();
     const original = await this.original(index);
+    await this.turnGate?.done;
     const started = performance.now();
     signal.throwIfAborted();
     const enhanced = await enhanceImage(original, style, this.target(), signal);
@@ -257,10 +295,12 @@ export class ImagePages {
   }
   async dispose() {
     this.disposed = true;
+    this.pause(false);
     // 只取消本书任务；Anime4K Worker 与已编译模型留给下一本书，闲置后自行释放。
     await this.cancelPending();
     for (const key of [...this.enhanced.keys()]) this.evict(key);
     this.originals.clear();
+    this.decoded.clear();
     this.originalBytes = 0;
   }
 }

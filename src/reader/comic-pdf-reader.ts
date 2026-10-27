@@ -122,10 +122,17 @@ export class ComicPdfReader implements ReaderEngine {
       style = this.style;
     const last = Math.max(...spreadPages(page, this.pages, this.isDouble()));
     const indices = [last + 1, last + 2].filter((index) => index < this.pages);
+    // 连续快速翻页时不预处理：停在一页约半秒后才开始，避免翻页途中
+    // 显卡被预处理占满。
     this.prefetchTimer = setTimeout(() => {
-      if (!this.disposed && this.page === page && this.style === style)
+      if (
+        !this.disposed &&
+        !this.turning &&
+        this.page === page &&
+        this.style === style
+      )
         void this.images?.prefetch(indices, style).catch(() => {});
-    }, 180);
+    }, 500);
   }
 
   constructor(
@@ -158,6 +165,8 @@ export class ComicPdfReader implements ReaderEngine {
       this.enabled,
       host,
       () => this.style.motion === "curl" && this.style.direction !== "ttb",
+      undefined,
+      () => this.style.direction !== "ttb",
     );
     if (this.format === "pdf") {
       this.pdfTask = await openSourcePdf(this.source, (error) => {
@@ -391,6 +400,17 @@ export class ComicPdfReader implements ReaderEngine {
     if (this.disposed || generation !== this.generation) return;
     this.publish();
     this.enhanceVisible();
+    if (this.images) {
+      const double = this.isDouble();
+      this.images.preload(
+        [1, -1].flatMap((delta) => {
+          const page = turnPage(this.page, this.pages, double, delta);
+          return page === this.page
+            ? []
+            : spreadPages(page, this.pages, double);
+        }),
+      );
+    }
   }
   private isDouble() {
     return (
@@ -612,6 +632,7 @@ export class ComicPdfReader implements ReaderEngine {
     if (!this.host) return;
     const previous = this.page;
     this.turning = true;
+    this.images?.pause(true);
     try {
       await turnPageSurface(
         this.host,
@@ -635,6 +656,7 @@ export class ComicPdfReader implements ReaderEngine {
       );
     } finally {
       this.turning = false;
+      this.images?.pause(false);
       if (this.resizePending && !this.disposed) {
         this.resizePending = false;
         await this.resize();

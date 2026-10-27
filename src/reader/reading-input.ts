@@ -91,6 +91,7 @@ export function bindReadingInput(
   surface: HTMLElement,
   draggable: () => boolean,
   scroll?: { enabled: () => boolean; by: (dx: number, dy: number) => void },
+  wheelPaging: () => boolean = () => false,
 ) {
   let pointerStart:
     | {
@@ -272,19 +273,49 @@ export function bindReadingInput(
   // Native HTML image/text dragging starts a separate OS drag session and
   // cancels pointer events. Selection and the reader's own turn gesture own it.
   const dragstart = (event: Event) => event.preventDefault();
+  // 滚轮翻页：鼠标滚轮每一格翻一页；触控板和惯性滚动先累积，一次滑动
+  // 只翻一页，停顿后才能再翻。页面放大后可滚动时，先滚到边缘再翻页。
+  let wheelSum = 0;
+  let wheelLocked = false;
+  let wheelQuiet: ReturnType<typeof setTimeout> | undefined;
+  let wheelRelease: ReturnType<typeof setTimeout> | undefined;
   const wheel = (event: Event) => {
     const e = event as WheelEvent;
+    if (!enabled() || e.ctrlKey || isInteractive(e.target)) return;
+    const unit =
+      e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? surface.clientHeight : 1;
+    if (scroll?.enabled()) {
+      e.preventDefault();
+      scroll.by(e.deltaX * unit, e.deltaY * unit);
+      return;
+    }
+    if (!wheelPaging()) return;
+    const delta =
+      Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY * unit : 0;
+    if (!delta) return;
+    const overflow = surface.scrollHeight - surface.clientHeight;
     if (
-      !enabled() ||
-      !scroll?.enabled() ||
-      e.ctrlKey ||
-      isInteractive(e.target)
+      overflow > 1 &&
+      (delta > 0 ? surface.scrollTop < overflow - 1 : surface.scrollTop > 0)
     )
       return;
     e.preventDefault();
-    const unit =
-      e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? surface.clientHeight : 1;
-    scroll.by(e.deltaX * unit, e.deltaY * unit);
+    clearTimeout(wheelQuiet);
+    wheelQuiet = setTimeout(() => {
+      wheelSum = 0;
+      wheelLocked = false;
+    }, 180);
+    if (wheelLocked) return;
+    wheelSum += delta;
+    if (Math.abs(wheelSum) < 40) return;
+    const action = wheelSum > 0 ? "next" : "previous";
+    wheelSum = 0;
+    wheelLocked = true;
+    // 明显的滚轮格（而非触控板的细小增量）连续滚动时，每 300 毫秒可再翻一页。
+    clearTimeout(wheelRelease);
+    if (Math.abs(delta) >= 50 || e.deltaMode !== 0)
+      wheelRelease = setTimeout(() => (wheelLocked = false), 300);
+    move(action);
   };
   // 小说换章会销毁旧 iframe。卷页和上下拖动都把后续指针事件交给
   // 稳定的主文档，避免跨章后丢失拖动或鼠标松开事件；文字选择不接管。
@@ -331,7 +362,7 @@ export function bindReadingInput(
   target.addEventListener("click", click);
   target.addEventListener("contextmenu", contextmenu);
   target.addEventListener("dragstart", dragstart);
-  if (scroll) target.addEventListener("wheel", wheel, { passive: false });
+  target.addEventListener("wheel", wheel, { passive: false });
   return () => {
     if (target === surface) liveGestures.get(surface)?.();
     detached = true;
@@ -346,5 +377,7 @@ export function bindReadingInput(
     target.removeEventListener("contextmenu", contextmenu);
     target.removeEventListener("dragstart", dragstart);
     target.removeEventListener("wheel", wheel);
+    clearTimeout(wheelQuiet);
+    clearTimeout(wheelRelease);
   };
 }
