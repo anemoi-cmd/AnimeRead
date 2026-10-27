@@ -49,6 +49,10 @@ export interface ReaderStyle {
   encoding: TextEncoding;
   zoom: number;
   comicLayout: "single" | "double";
+  /** 漫画自动裁掉扫描白边。 */
+  cropMargins: boolean;
+  /** 单页模式下把横向跨页拆成两半依次显示。 */
+  splitSpreads: boolean;
   enhanceEnabled: boolean;
   enhanceBackend: "anime4k" | "waifu2x";
   filters: FilterMode[];
@@ -122,6 +126,8 @@ export const DEFAULT_STYLE: ReaderStyle = {
       : Math.max(0.5, Math.min(3, window.devicePixelRatio || 1)),
   enhanceEnabled: false,
   comicLayout: "single",
+  cropMargins: true,
+  splitSpreads: false,
   enhanceBackend: "anime4k",
   filters: ["A"],
 };

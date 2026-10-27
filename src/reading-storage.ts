@@ -136,6 +136,8 @@ export function loadMemory(): ReadingMemory {
       )
     )
       style.encoding = DEFAULT_STYLE.encoding;
+    style.cropMargins = style.cropMargins !== false;
+    style.splitSpreads = style.splitSpreads === true;
     style.bold = style.bold === true;
     style.italic = style.italic === true;
     style.fontSize = Math.max(12, Math.min(64, Number(style.fontSize) || 22));

@@ -40,7 +40,7 @@ export class ImagePages {
     private source: ByteSource,
     private names: string[],
     private archive: BookArchive | undefined,
-    private target: () => EnhanceTarget,
+    private target: (index: number) => EnhanceTarget,
   ) {}
   private async decode(blob: Blob, index: number) {
     const url = URL.createObjectURL(blob),
@@ -112,7 +112,7 @@ export class ImagePages {
   }
   /** 目标尺寸按 64 像素取整，窗口微调不会让整本缓存失效。 */
   private key(index: number, style: ReaderStyle) {
-    const target = this.target();
+    const target = this.target(index);
     const round = (value: number) =>
       Number.isFinite(value) ? Math.ceil(value / 64) * 64 : "auto";
     return `${index}:${style.enhanceBackend}:${style.filters.join("+")}:${round(target.width)}x${round(target.height)}`;
@@ -127,7 +127,7 @@ export class ImagePages {
     if (!style.enhanceEnabled || style.enhanceBackend !== "anime4k") return;
     void (async () => {
       const bitmap = await createImageBitmap(await this.original(index));
-      const fit = fitRatio(bitmap.width, bitmap.height, this.target());
+      const fit = fitRatio(bitmap.width, bitmap.height, this.target(index));
       bitmap.close();
       const filters = neededFilters(style.filters, fit);
       if (filters.length && !this.disposed && (await anime4kDevice()))
@@ -244,7 +244,12 @@ export class ImagePages {
     await this.turnGate?.done;
     const started = performance.now();
     signal.throwIfAborted();
-    const enhanced = await enhanceImage(original, style, this.target(), signal);
+    const enhanced = await enhanceImage(
+      original,
+      style,
+      this.target(index),
+      signal,
+    );
     if (enhanced.skipped) {
       signal.throwIfAborted();
       return {

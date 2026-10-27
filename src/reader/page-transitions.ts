@@ -141,16 +141,20 @@ export function captureFixedPage(
         const scaleY = canvas.height / bound.height;
         const x = (image.left - bound.left) * scaleX;
         const y = (image.top - bound.top) * scaleY;
+        // 裁白边／半页时图片比页面框大，只复制框内露出的部分。
+        const shown = (
+          source.closest(".image-frame") ?? source
+        ).getBoundingClientRect();
+        const clipX = (shown.left - bound.left) * scaleX,
+          clipY = (shown.top - bound.top) * scaleY,
+          clipWidth = shown.width * scaleX,
+          clipHeight = shown.height * scaleY;
         // 快照与静态图片使用相同的纹理原点；只合成显示效果，不改源文件。
-        paintPaper(
-          context,
-          theme,
-          x,
-          y,
-          image.width * scaleX,
-          image.height * scaleY,
-          ratio,
-        );
+        paintPaper(context, theme, clipX, clipY, clipWidth, clipHeight, ratio);
+        context.save();
+        context.beginPath();
+        context.rect(clipX, clipY, clipWidth, clipHeight);
+        context.clip();
         context.globalCompositeOperation = paperBlendsInk(theme)
           ? "multiply"
           : "source-over";
@@ -161,7 +165,7 @@ export function captureFixedPage(
           image.width * scaleX,
           image.height * scaleY,
         );
-        context.globalCompositeOperation = "source-over";
+        context.restore();
       }
     }
     canvas.style.cssText =

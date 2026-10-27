@@ -11,13 +11,14 @@ export class ImageFrame {
   private divider = document.createElement("button");
   private labels = document.createElement("div");
   private split = 50;
+  // 显示原图的哪一块（裁白边／半页）。框的比例和排版尺寸都按这块计算。
+  private view: ViewRect;
   constructor(private original: HTMLImageElement) {
     this.width = original.naturalWidth;
     this.height = original.naturalHeight;
+    this.view = { x: 0, y: 0, width: this.width, height: this.height };
     this.element.className = "image-frame";
-    this.element.dataset.sourceWidth = String(this.width);
-    this.element.dataset.sourceHeight = String(this.height);
-    this.element.style.aspectRatio = `${this.width}/${this.height}`;
+    this.setView(this.view);
     this.divider.className = "quality-divider";
     this.divider.type = "button";
     this.divider.setAttribute("role", "slider");
@@ -66,6 +67,10 @@ export class ImageFrame {
   private setSplit(value: number) {
     this.split = Math.max(0, Math.min(100, value));
     this.element.style.setProperty("--quality-split", `${this.split}%`);
+    // 图片比框大（只露出一部分）时，裁切线要换算到整张图的坐标。
+    const imageSplit =
+      (((this.split / 100) * this.view.width + this.view.x) / this.width) * 100;
+    this.element.style.setProperty("--quality-split-image", `${imageSplit}%`);
     this.divider.setAttribute("aria-valuenow", String(Math.round(this.split)));
   }
   enhance(
@@ -77,8 +82,26 @@ export class ImageFrame {
     this.enhanced = image;
     this.enhancement = enhancement;
     this.original.className = "quality-original";
+    this.place(image);
     this.element.insertBefore(image, this.labels);
     this.compare(compare);
+  }
+  /** 只显示原图的一块：框按这块的尺寸排版，图片按比例放大并平移。 */
+  setView(view: ViewRect) {
+    this.view = view;
+    this.element.dataset.sourceWidth = String(view.width);
+    this.element.dataset.sourceHeight = String(view.height);
+    this.element.style.aspectRatio = `${view.width}/${view.height}`;
+    this.place(this.original);
+    if (this.enhanced) this.place(this.enhanced);
+    this.setSplit(this.split);
+  }
+  private place(image: PageImage) {
+    const view = this.view;
+    image.style.left = `${(-view.x / view.width) * 100}%`;
+    image.style.top = `${(-view.y / view.height) * 100}%`;
+    image.style.width = `${(this.width / view.width) * 100}%`;
+    image.style.height = `${(this.height / view.height) * 100}%`;
   }
   /** 原图已足够清晰：记录结论，页面继续显示原图。 */
   keepOriginal(enhancement?: ReaderSnapshot["enhancement"]) {
@@ -94,3 +117,4 @@ export class ImageFrame {
 }
 import type { ReaderSnapshot } from "../reader-types";
 import type { PageImage } from "./image-page-cache";
+import type { ViewRect } from "./page-crop";

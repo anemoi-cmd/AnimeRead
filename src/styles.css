@@ -1952,10 +1952,10 @@ kbd {
   display: none;
 }
 .image-frame.is-comparing .comic-page {
-  clip-path: inset(0 0 0 var(--quality-split, 50%));
+  clip-path: inset(0 0 0 var(--quality-split-image, 50%));
 }
 .image-frame.is-comparing .quality-original {
-  clip-path: inset(0 calc(100% - var(--quality-split, 50%)) 0 0);
+  clip-path: inset(0 calc(100% - var(--quality-split-image, 50%)) 0 0);
 }
 /* 两张对比图在各自半边混合，避免增强图与原图重复相乘。 */
 .fixed-surface .fixed-page-slot,

@@ -82,6 +82,7 @@
 | reader/comic-pdf-reader.ts | 漫画／PDF 固定页面框、等比适配、单双页槽、缩放与增强预缓存 |
 | reader/image-page-cache.ts | 原图压缩缓存、增强位图缓存、加载与取消 |
 | reader/image-page-view.ts | 固定原图尺寸和可拖动画质对比 |
+| reader/page-crop.ts | 白边检测、跨页拆分，给出每页的显示区域 |
 | reader/comic-scroll-reader.ts | 最多五页的漫画上下阅读、拖动与页顶对齐 |
 | reader/spread-layout.ts | 双页分组、封面与翻页步长 |
 | reader/page-transitions.ts | 共用翻页事务、包含留白的页面快照、准备遮罩、书脊卷页、滑动过渡 |
@@ -165,7 +166,8 @@ vendor 保存经过必要修补、固定版本的源码。直接删除会使小�
 | tests/core/storage.spec.ts | 设置迁移与异常恢复 |
 | tests/core/groups.spec.ts | 分组、卷序与合并 |
 | tests/core/range.spec.ts | HTTP 区间和版本边界 |
-| tests/core/enhancement.spec.ts | 超分输出尺寸策略 |
+| tests/core/enhancement.spec.ts | 超分输出尺寸与按需规划 |
+| tests/core/crop.spec.ts | 漫画白边检测的裁切与不裁情形 |
 | tests/e2e/comic.spec.ts | 漫画分类、动画、声音、上下阅读与缩放 |
 | tests/e2e/regression.spec.ts | TXT／EPUB／PDF、单双页、全屏设置与隔离 |
 | tests/e2e/reading-upgrade.spec.ts | 封面、主题、计时、漫画双页 |

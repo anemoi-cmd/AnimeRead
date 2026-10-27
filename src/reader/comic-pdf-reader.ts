@@ -22,6 +22,7 @@ import { applyPaperTheme } from "./paper-theme";
 import { ImagePages } from "./image-page-cache";
 import { VerticalPages } from "./comic-scroll-reader";
 import { ImageFrame } from "./image-page-view";
+import { pageViews, type ViewRect } from "./page-crop";
 import { spreadPages, turnPage } from "./spread-layout";
 import type { ComicEpub } from "./epub-inspection";
 import { BookArchive } from "./book-archive";
@@ -101,9 +102,64 @@ export class ComicPdfReader implements ReaderEngine {
   private resizePending = false;
   private resizeQueue = Promise.resolve();
   private layoutViewport?: ReturnType<ComicPdfReader["viewport"]>;
-  private async makeFrame(image: HTMLImageElement, index: number) {
+  // 每页的显示区域（裁白边、拆分宽页），按设置组合缓存；同步副本供翻页判断。
+  private views = new Map<string, Promise<ViewRect[]>>();
+  private resolvedViews = new Map<string, ViewRect[]>();
+  private naturalSizes = new Map<number, { width: number; height: number }>();
+  // 拆分后的宽页当前显示第几半；-1 表示向前翻进来时的最后一半。
+  private part = 0;
+  private viewOptions() {
+    return {
+      crop: this.style.cropMargins,
+      split:
+        this.style.splitSpreads &&
+        !this.isDouble() &&
+        this.style.direction !== "ttb",
+      rightToLeft: this.style.direction === "rtl",
+    };
+  }
+  private viewKey(index: number) {
+    const options = this.viewOptions();
+    return `${index}:${options.crop}:${options.split}:${options.rightToLeft}`;
+  }
+  private viewsOf(index: number, image: HTMLImageElement) {
+    const key = this.viewKey(index);
+    let views = this.views.get(key);
+    if (!views) {
+      views = pageViews(image, this.viewOptions())
+        .catch(() => [
+          {
+            x: 0,
+            y: 0,
+            width: image.naturalWidth,
+            height: image.naturalHeight,
+          },
+        ])
+        .then((value) => {
+          this.resolvedViews.set(key, value);
+          return value;
+        });
+      this.views.set(key, views);
+      // 只保留最近几百页的结果，长篇也不会无限增长。
+      if (this.views.size > 400) {
+        const oldest = this.views.keys().next().value!;
+        this.views.delete(oldest);
+        this.resolvedViews.delete(oldest);
+      }
+    }
+    return views;
+  }
+  /** 当前页拆成几部分（未分析或未拆分时为 1）。 */
+  private partsOf(index: number) {
+    return this.resolvedViews.get(this.viewKey(index))?.length ?? 1;
+  }
+  private async makeFrame(image: HTMLImageElement, index: number, part = 0) {
     image.dataset.page = String(index);
     const frame = new ImageFrame(image);
+    const views = await this.viewsOf(index, image);
+    frame.setView(
+      views[part < 0 ? views.length - 1 : Math.min(part, views.length - 1)],
+    );
     frame.element.dataset.page = String(index);
     this.frames.set(frame.element, frame);
     if (this.images?.hasEnhanced(index, this.style)) {
@@ -222,8 +278,11 @@ export class ComicPdfReader implements ReaderEngine {
           : 0;
     this.page = Math.min(this.pages - 1, Math.max(0, restored));
     if (!this.pdf) {
-      this.images = new ImagePages(this.source, this.names, this.archive, () =>
-        this.enhanceTarget(),
+      this.images = new ImagePages(
+        this.source,
+        this.names,
+        this.archive,
+        (index) => this.enhanceTarget(index),
       );
       this.images.warm(this.style, this.page);
     }
@@ -323,7 +382,11 @@ export class ComicPdfReader implements ReaderEngine {
       ...this.snapshot,
       page: this.page + 1,
       pages: this.pages,
-      chapter: `第 ${shown.map((page) => page + 1).join("–")} / ${this.pages} 页`,
+      chapter:
+        `第 ${shown.map((page) => page + 1).join("–")} / ${this.pages} 页` +
+        (shown.length === 1 && this.partsOf(this.page) > 1
+          ? ` · ${this.part + 1}/${this.partsOf(this.page)}`
+          : ""),
       location: {
         kind: "fixed",
         page: this.page,
@@ -386,10 +449,17 @@ export class ComicPdfReader implements ReaderEngine {
       const pages = spreadPages(this.page, this.pages, this.isDouble());
       const loaded = await Promise.all(
         pages.map(async (index) =>
-          this.makeFrame(await this.images!.loadOriginal(index), index),
+          this.makeFrame(
+            await this.images!.loadOriginal(index),
+            index,
+            pages.length === 1 ? this.part : 0,
+          ),
         ),
       );
       if (this.disposed || generation !== this.generation) return;
+      // 向前翻进拆分页时显示最后一半；设置改为不拆分时回到整页。
+      const parts = pages.length === 1 ? this.partsOf(this.page) : 1;
+      this.part = this.part < 0 ? parts - 1 : Math.min(this.part, parts - 1);
       const { spread, slots } = this.createSpread("comic-spread", pages);
       this.spread = spread;
       loaded.forEach((image, index) => slots[index].append(image));
@@ -499,13 +569,23 @@ export class ComicPdfReader implements ReaderEngine {
    * 尺寸为“视口 × 缩放 ÷ 像素比”，换成设备像素即“视口 × 缩放”；双页各占
    * 一半，上下阅读只限宽度。按屏幕而不是当前窗口计算，切换全屏不必重算。
    */
-  private enhanceTarget() {
+  private enhanceTarget(index: number) {
     const width = screen.width * this.style.zoom;
-    if (this.style.direction === "ttb")
-      return { width, height: Number.POSITIVE_INFINITY };
+    const target =
+      this.style.direction === "ttb"
+        ? { width, height: Number.POSITIVE_INFINITY }
+        : {
+            width: width / (this.isDouble() ? 2 : 1),
+            height: screen.height * this.style.zoom,
+          };
+    // 裁白边或半页只显示原图的一部分，这部分被放得更大；把目标框按
+    // “整图 ÷ 显示区域”放大，超分输出才足够清晰。
+    const view = this.resolvedViews.get(this.viewKey(index))?.[0];
+    const size = this.naturalSizes.get(index);
+    if (!view || !size) return target;
     return {
-      width: width / (this.isDouble() ? 2 : 1),
-      height: screen.height * this.style.zoom,
+      width: (target.width * size.width) / view.width,
+      height: (target.height * size.height) / view.height,
     };
   }
   private systemScale() {
@@ -625,12 +705,16 @@ export class ComicPdfReader implements ReaderEngine {
       await this.vertical.goTo(next);
       return;
     }
-    if (next === this.page) {
+    // 拆分的宽页先翻到另一半，再翻到下一张原图。
+    const parts = this.isDouble() ? 1 : this.partsOf(this.page);
+    const withinPage = delta > 0 ? this.part < parts - 1 : this.part > 0;
+    if (next === this.page && !withinPage) {
       this.host?.scrollTo({ top: 0, left: 0 });
       return;
     }
     if (!this.host) return;
-    const previous = this.page;
+    const previous = this.page,
+      previousPart = this.part;
     this.turning = true;
     this.images?.pause(true);
     try {
@@ -640,15 +724,20 @@ export class ComicPdfReader implements ReaderEngine {
         delta,
         () =>
           this.host
-            ? captureFixedPage(this.host, `page:${this.page}`)
+            ? captureFixedPage(this.host, `page:${this.page}:${this.part}`)
             : undefined,
         async () => {
-          this.page = next;
+          if (withinPage) this.part += delta;
+          else {
+            this.page = next;
+            this.part = delta > 0 ? 0 : -1;
+          }
           await this.render();
         },
         async () => {
           if (!this.disposed) {
             this.page = previous;
+            this.part = previousPart;
             await this.render();
           }
         },
@@ -677,6 +766,7 @@ export class ComicPdfReader implements ReaderEngine {
     const page = Number(target);
     if (!Number.isFinite(page)) return;
     this.page = Math.min(this.pages - 1, Math.max(0, Math.round(page)));
+    this.part = 0;
     if (this.vertical) await this.vertical.goTo(this.page);
     else await this.render();
   }
@@ -702,8 +792,11 @@ export class ComicPdfReader implements ReaderEngine {
     if (
       old.direction !== style.direction ||
       old.comicLayout !== style.comicLayout ||
+      old.cropMargins !== style.cropMargins ||
+      old.splitSpreads !== style.splitSpreads ||
       pipelineChanged
     ) {
+      this.part = 0;
       await this.cancelPending();
       if (pipelineChanged) this.images?.warm(style, this.page);
       this.vertical?.dispose();

@@ -188,6 +188,43 @@ export function Preferences({
           <option value="single">单页</option>
           <option value="double">双页</option>
         </select>
+        {comic && (
+          <>
+            <label className="switch-row">
+              <span>
+                自动裁切白边
+                <small>去掉扫描留下的空白边，画面更大</small>
+              </span>
+              <input
+                type="checkbox"
+                aria-label="自动裁切白边"
+                checked={style.cropMargins}
+                onChange={(event) =>
+                  setStyle({ cropMargins: event.target.checked })
+                }
+              />
+            </label>
+            <label className="switch-row">
+              <span>
+                拆分横向跨页
+                <small>
+                  单页阅读时把左右相连的大图分成两页，按阅读方向先后显示
+                </small>
+              </span>
+              <input
+                type="checkbox"
+                aria-label="拆分横向跨页"
+                checked={style.splitSpreads}
+                disabled={
+                  style.comicLayout === "double" || style.direction === "ttb"
+                }
+                onChange={(event) =>
+                  setStyle({ splitSpreads: event.target.checked })
+                }
+              />
+            </label>
+          </>
+        )}
       </div>
       {comic && (
         <div className="setting-group">
