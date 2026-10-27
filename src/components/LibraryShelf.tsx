@@ -12,7 +12,7 @@ import type { ByteSource, ShelfBook as Book } from "../reader-types";
 import type { ReadingMemory } from "../reading-storage";
 import type { BookGroup } from "../book-groups";
 import { useBookCovers } from "../book-covers";
-import { BookCard } from "./BookCard";
+import { BookCard, BookSpine, followPointer } from "./BookCard";
 import { DEFAULT_APPEARANCE } from "../appearance-settings";
 const PAGE_SIZE = 60;
 const lastGroupCover = new Map<string, string>();
@@ -183,10 +183,12 @@ export function LibraryShelf({
             className="recent-book"
             onClick={() => void open(recent)}
             aria-label={`继续阅读 ${recentTitle}`}
+            {...followPointer}
           >
             {covers[recent.id] ? (
               <span className="book-3d is-small">
                 <span className="book-pages" aria-hidden="true" />
+                <BookSpine cover={covers[recent.id]} color="sage" />
                 <img
                   className="book-cover"
                   src={covers[recent.id]}
@@ -300,9 +302,14 @@ export function LibraryShelf({
                 key={entry.group.id}
                 aria-label={`打开分组 ${entry.group.name}`}
                 onClick={() => groupChange(entry.group.id)}
+                {...followPointer}
               >
                 <div className="book-3d">
                   <span className="book-pages" aria-hidden="true" />
+                  <BookSpine
+                    cover={covers[groupCovers[entry.group.id]]}
+                    color="sage"
+                  />
                   <div className="book-cover cover-sage">
                     {covers[groupCovers[entry.group.id]] ? (
                       <img

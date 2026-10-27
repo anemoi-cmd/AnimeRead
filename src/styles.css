@@ -2623,22 +2623,50 @@ kbd {
    3D 书本：封面略向前，右侧是书页侧边，背后是封底和地面阴影。静止时
    微微转向，悬停时转得更多并抬起。--thick 为书的厚度。
    ========================================================================== */
+/* 整个书架共用一个视点（像一台相机从中间看过去）：左边的书露出右侧书页，
+   右边的书露出左侧书脊，中间的书正对读者。悬停时书本转向鼠标。 */
+.book-grid {
+  perspective: 1000px;
+  perspective-origin: 50% 30%;
+}
 .book-card {
-  perspective: 1100px;
+  transform-style: preserve-3d;
 }
 .book-3d {
-  --thick: 12px;
+  --thick: 14px;
   position: relative;
   display: block;
   width: 100%;
   aspect-ratio: 2 / 3;
   transform-style: preserve-3d;
-  transform: rotateY(-18deg);
-  transition: transform 0.4s var(--ease);
+  transform: rotateX(var(--turn-x, 0deg)) rotateY(var(--turn-y, 0deg));
+  transition: transform 0.5s var(--ease);
 }
-.book-card:hover .book-3d,
+.book-card:hover .book-3d {
+  transform: translateY(-6px) rotateX(var(--turn-x, 0deg))
+    rotateY(var(--turn-y, 0deg));
+  transition: transform 0.15s ease-out;
+}
+/* 首页的“上次阅读”在卡片右侧，单独微微转向，露出书脊。 */
+.recent-book .book-3d {
+  transform: rotateX(var(--turn-x, 0deg))
+    rotateY(calc(16deg + var(--turn-y, 0deg)));
+}
 .recent-book:hover .book-3d {
-  transform: rotateY(-30deg) translateY(-6px);
+  transition: transform 0.15s ease-out;
+}
+/* 书脊：封面图贴在左侧窄面，颜色与封面一致，再压暗一些表现转角。 */
+.book-spine {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc(var(--thick) / -2);
+  width: var(--thick);
+  transform: rotateY(-90deg);
+  background-size: cover;
+  background-position: left center;
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 100vmax #00000033;
 }
 .book-3d > .book-cover {
   position: absolute;
@@ -2705,7 +2733,8 @@ kbd {
 }
 @media (prefers-reduced-motion: reduce) {
   .book-3d,
-  .book-card:hover .book-3d {
+  .book-card:hover .book-3d,
+  .recent-book .book-3d {
     transform: none;
   }
 }
