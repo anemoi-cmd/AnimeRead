@@ -14,8 +14,6 @@ interface PageSurface {
   element: HTMLElement;
   sheets: HTMLElement[];
   spread: boolean;
-  /** 双页且开启书脊阴影：快照里已含中缝，卷页时舞台上也要画。 */
-  spine: boolean;
   width: number;
   height: number;
   left: number;
@@ -23,11 +21,13 @@ interface PageSurface {
   anchor: string;
 }
 
-/** 中缝阴影元素，样式与静态双页的书脊相同。 */
-function spineElement() {
-  const spine = document.createElement("div");
-  spine.className = "page-spine";
-  return spine;
+/** 书脊阴影：贴在纸张靠中缝的一侧（left／right），或小说整面的正中（center）。
+ * 阴影属于纸张本身，翻页时随纸翻起，被翻过来的纸遮住。
+ */
+function gutterElement(side: "left" | "right" | "center") {
+  const gutter = document.createElement("div");
+  gutter.className = `page-gutter is-${side}`;
+  return gutter;
 }
 /** Rendering a new fixed page must retain the opaque old-page cover. */
 export function replacePageContent(host: HTMLElement, ...nodes: Node[]) {
@@ -128,7 +128,8 @@ export function captureFixedPage(
     Math.sqrt(8_000_000 / (rect.width * rect.height)),
   );
   const element = document.createElement("div");
-  const sheets = slots.map((slot) => {
+  const spine = slots.length === 2 && paper.classList.contains("has-spine");
+  const sheets = slots.map((slot, index) => {
     const bound = slot.getBoundingClientRect();
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.ceil(bound.width * ratio));
@@ -180,6 +181,7 @@ export function captureFixedPage(
     sheet.dataset.sourcePage = slot.dataset.page ?? "";
     sheet.style.cssText = `position:absolute;left:${((bound.left - rect.left) / rect.width) * 100}%;top:0;width:${(bound.width / rect.width) * 100}%;height:100%`;
     sheet.append(canvas);
+    if (spine) sheet.append(gutterElement(index === 0 ? "right" : "left"));
     return sheet;
   });
   // 遮罩与动画纸张独立持有像素；把纸张交给卷页引擎时，旧页不会被
@@ -194,13 +196,10 @@ export function captureFixedPage(
       return copy;
     }),
   );
-  const spine = slots.length === 2 && paper.classList.contains("has-spine");
-  if (spine) element.append(spineElement());
   return {
     element,
     sheets,
     spread: slots.length === 2,
-    spine,
     width: rect.width,
     height: rect.height,
     left: rect.left - parent.left,
@@ -386,17 +385,17 @@ export async function captureNovelPage(
     sheets.forEach((sheet) => sheet.remove());
     preparation.remove();
   }
-  sheets.forEach((sheet) => {
+  const spine = spread && host.classList.contains("has-spine");
+  sheets.forEach((sheet, index) => {
     sheet.style.position = "relative";
     sheet.style.left = "";
+    if (spine) sheet.append(gutterElement(index === 0 ? "right" : "left"));
   });
-  const spine = spread && host.classList.contains("has-spine");
-  if (spine) element.append(spineElement());
+  if (spine) element.append(gutterElement("center"));
   return {
     element,
     sheets,
     spread,
-    spine,
     width: hostRect.width,
     height: hostRect.height,
     left: 0,
@@ -501,13 +500,6 @@ async function curlPage(
         }
       });
       flip!.on("init", () => {
-        // 中缝阴影留在卷页舞台最上层：静止的两页始终有书脊，翻起的纸张
-        // 经过中缝时同样带一点阴影，像纸页弯进装订处。
-        if (spread && before.spine) {
-          const spine = spineElement();
-          spine.classList.add("curl-spine");
-          stage.append(spine);
-        }
         // Let the renderer establish its RAF clock before starting the motion.
         animationRequest = requestAnimationFrame(() => {
           overlay.style.opacity = "1";

@@ -75,7 +75,14 @@ jobs:
           $readerVersion = (Get-Content package.json -Raw | ConvertFrom-Json).version
           $readerTag = 'v' + $readerVersion
           gh release view $readerTag --repo $env:GITHUB_REPOSITORY > $null 2>&1
-          if ($LASTEXITCODE -eq 0) { throw 'Version already published; increment package version first' }
+          if ($LASTEXITCODE -eq 0) {
+            # 同一提交不能重复发布；维护者把版本标签强制移到新提交时，视为
+            # 有意修正这一版，用新构建替换旧的发布（标签保留）。
+            $readerPublished = gh release view $readerTag --repo $env:GITHUB_REPOSITORY --json targetCommitish --jq .targetCommitish
+            if ($readerPublished -eq $env:GITHUB_SHA) { throw 'Version already published; increment package version first' }
+            gh release delete $readerTag --repo $env:GITHUB_REPOSITORY --yes
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          }
           $readerNotes = Get-Content latest.json -Raw | ConvertFrom-Json
           $readerNotes.notes | Set-Content release-notes.txt -Encoding utf8
           gh release create $readerTag --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --draft --title "AnimeRead $readerVersion" --notes-file release-notes.txt

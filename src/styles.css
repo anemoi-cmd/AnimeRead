@@ -1848,29 +1848,74 @@ kbd {
 .foliate-surface::part(foot) {
   display: none;
 }
-/* 双页书脊阴影：小说、漫画、PDF 共用同一条中缝。静态页用伪元素，
-   翻页快照和卷页舞台里放同样的 .page-spine，翻页前后看起来一致。 */
+/* 书脊：纸页在装订处弯下去，每一页靠中缝的一侧逐渐变暗、到折缝最深，
+   左右两页的阴影在中缝相接。阴影属于每一张纸本身：翻页时随纸翻起，
+   翻过来的纸会盖住下面的中缝，和纸质书一致。正片叠底让阴影压进纸色
+   和画面，而不是浮在上面的一条灰带。 */
+.comic-spread.has-spine > .fixed-page-slot,
+.pdf-spread.has-spine > .fixed-page-slot {
+  position: relative;
+}
+.comic-spread.has-spine > .fixed-page-slot::after,
+.pdf-spread.has-spine > .fixed-page-slot::after,
 .novel-spread.has-spine::after,
-.comic-spread.has-spine::after,
-.pdf-spread.has-spine::after,
-.page-spine {
+.page-gutter {
   content: "";
   position: absolute;
   top: 0;
   bottom: 0;
-  left: 50%;
-  width: 24px;
-  transform: translateX(-50%);
-  background: linear-gradient(
-    90deg,
-    transparent,
-    #0000000b 40%,
-    #00000022 49%,
-    #0000000d 54%,
-    transparent
-  );
   pointer-events: none;
   z-index: 7;
+  mix-blend-mode: multiply;
+}
+/* 左页：阴影在右侧（靠中缝）。 */
+.comic-spread.has-spine > .fixed-page-slot[data-slot="0"]::after,
+.pdf-spread.has-spine > .fixed-page-slot[data-slot="0"]::after,
+.page-gutter.is-right {
+  right: 0;
+  width: clamp(24px, 12%, 96px);
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgb(0 0 0 / 0.02) 35%,
+    rgb(0 0 0 / 0.06) 65%,
+    rgb(0 0 0 / 0.12) 88%,
+    rgb(0 0 0 / 0.2)
+  );
+}
+/* 右页：阴影在左侧（靠中缝）。 */
+.comic-spread.has-spine > .fixed-page-slot[data-slot="1"]::after,
+.pdf-spread.has-spine > .fixed-page-slot[data-slot="1"]::after,
+.page-gutter.is-left {
+  left: 0;
+  width: clamp(24px, 12%, 96px);
+  background: linear-gradient(
+    to left,
+    transparent,
+    rgb(0 0 0 / 0.02) 35%,
+    rgb(0 0 0 / 0.06) 65%,
+    rgb(0 0 0 / 0.12) 88%,
+    rgb(0 0 0 / 0.2)
+  );
+}
+/* 小说双栏是同一张排版面：在正中画两页相接的整条中缝。 */
+.novel-spread.has-spine::after,
+.page-gutter.is-center {
+  left: 50%;
+  transform: translateX(-50%);
+  width: clamp(48px, 12%, 192px);
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgb(0 0 0 / 0.02) 17%,
+    rgb(0 0 0 / 0.06) 32%,
+    rgb(0 0 0 / 0.12) 44%,
+    rgb(0 0 0 / 0.2) 50%,
+    rgb(0 0 0 / 0.12) 56%,
+    rgb(0 0 0 / 0.06) 68%,
+    rgb(0 0 0 / 0.02) 83%,
+    transparent
+  );
 }
 .fixed-surface {
   overflow: auto;
@@ -2613,10 +2658,6 @@ kbd {
 .progress-preview b {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
-}
-/* 卷页舞台中的书脊位于翻页引擎各层之上。 */
-.curl-spine {
-  z-index: 1000;
 }
 
 /* ==========================================================================

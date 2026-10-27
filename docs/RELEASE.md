@@ -18,7 +18,7 @@
 
 1. `pnpm install --frozen-lockfile`，`pnpm version:next`，更新 CHANGELOG.md。提交到 main。
 2. 推送版本标签（如 `git tag v0.9.7 && git push origin v0.9.7`），或在 GitHub 的 Actions 中手动运行 **Release** 工作流。它运行检查和测试，安装校验过的画质运行资源，构建便携／安装／源码包并签名。
-3. 工作流先创建草稿 Release，上传两种程序包、两份签名、源码包和 latest.json，最后公开为最新版本。用户在阅读器中检查更新即可。已经发布的版本号不能重复使用。
+3. 工作流先创建草稿 Release，上传两种程序包、两份签名、源码包和 latest.json，最后公开为最新版本。用户在阅读器中检查更新即可。已经发布的版本号原则上不重复使用；确需修正刚发布的版本时，把同名标签强制移到修正后的提交（`git tag -f -a vX.Y.Z` 后 `git push --force origin vX.Y.Z`），工作流会用新构建替换旧的发布。已经升级到该版本的用户不会再收到这次修正。
 
 也可本机构建：`reader.ps1 -Action Package -Toolchain System` 生成两种包和签名，再 `node scripts/package-source.mjs` 导出源码；将这些资产和 latest.json 全部上传到对应 v版本的草稿 Release，再发布。两个包必须同一次编译、同一把密钥签名，不能把旧签名套在新程序上。
 
