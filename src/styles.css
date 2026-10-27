@@ -592,16 +592,12 @@ button svg {
   border-radius: 6px;
   background: var(--accent-soft);
 }
-.recent-book img {
-  width: 96px;
-  height: 140px;
-  flex: none;
+.recent-book {
+  perspective: 700px;
+}
+.recent-book .book-cover {
+  padding: 0;
   object-fit: cover;
-  border-radius: 3px 6px 6px 3px;
-  box-shadow:
-    inset 3px 0 6px #0000001a,
-    0 2px 4px #0000001f,
-    0 10px 24px #00000024;
 }
 .recent-book div {
   min-width: 0;
@@ -789,7 +785,6 @@ button svg {
   box-shadow: inset 0 0 0 1px #0000000d;
 }
 .book-card:hover .book-cover {
-  transform: translateY(-6px);
   box-shadow:
     0 2px 4px #0000001a,
     0 14px 26px #2a2f221f,
@@ -901,36 +896,9 @@ button svg {
   justify-content: center;
   color: var(--accent);
 }
-/* 分组卡：背后叠两张纸，表示一套多卷。 */
-.group-card {
-  position: relative;
-}
-.group-card::before,
-.group-card::after {
-  content: "";
-  position: absolute;
-  left: 8%;
-  right: 8%;
-  top: -6px;
-  aspect-ratio: 2 / 3;
-  max-height: calc(100% - 60px);
-  border-radius: 3px 7px 7px 3px;
-  background: color-mix(in srgb, var(--accent) 22%, var(--surface));
-  box-shadow: var(--shadow-sm);
-  z-index: -1;
-  transition: transform 0.25s var(--ease);
-}
-.group-card::after {
-  left: 4%;
-  right: 4%;
-  top: -3px;
-  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-}
-.group-card:hover::before {
-  transform: translateY(-9px);
-}
-.group-card:hover::after {
-  transform: translateY(-7px);
+/* 分组卡：更厚的书本，表示一套多卷。 */
+.group-card .book-3d {
+  --thick: 22px;
 }
 .group-volume-count {
   position: absolute;
@@ -1880,9 +1848,12 @@ kbd {
 .foliate-surface::part(foot) {
   display: none;
 }
-.novel-spread::after,
-.turn-cover.has-novel-spine::after {
-  /* 静态书脊位于翻页遮罩之下，翻过来的纸张自然遮住它。 */
+/* 双页书脊阴影：小说、漫画、PDF 共用同一条中缝。静态页用伪元素，
+   翻页快照和卷页舞台里放同样的 .page-spine，翻页前后看起来一致。 */
+.novel-spread.has-spine::after,
+.comic-spread.has-spine::after,
+.pdf-spread.has-spine::after,
+.page-spine {
   content: "";
   position: absolute;
   top: 0;
@@ -1918,6 +1889,7 @@ kbd {
 }
 .comic-spread,
 .pdf-spread {
+  position: relative;
   display: grid;
   align-items: center;
   margin-inline: auto;
@@ -2641,4 +2613,99 @@ kbd {
 .progress-preview b {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+/* 卷页舞台中的书脊位于翻页引擎各层之上。 */
+.curl-spine {
+  z-index: 1000;
+}
+
+/* ==========================================================================
+   3D 书本：封面略向前，右侧是书页侧边，背后是封底和地面阴影。静止时
+   微微转向，悬停时转得更多并抬起。--thick 为书的厚度。
+   ========================================================================== */
+.book-card {
+  perspective: 1100px;
+}
+.book-3d {
+  --thick: 12px;
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  transform-style: preserve-3d;
+  transform: rotateY(-18deg);
+  transition: transform 0.4s var(--ease);
+}
+.book-card:hover .book-3d,
+.recent-book:hover .book-3d {
+  transform: rotateY(-30deg) translateY(-6px);
+}
+.book-3d > .book-cover {
+  position: absolute;
+  inset: 0;
+  transform: translateZ(calc(var(--thick) / 2));
+}
+/* 封底：带出地面阴影，使书本像放在桌上。 */
+.book-3d::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 3px 7px 7px 3px;
+  background: #b9b09f;
+  transform: translateZ(calc(var(--thick) / -2));
+  box-shadow:
+    0 6px 14px #0000002a,
+    14px 22px 34px #00000024;
+}
+/* 书页侧边：竖向细纹是一张张纸的边缘，两端稍暗表现弧度。 */
+.book-pages {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: calc(100% - var(--thick) / 2 - 2px);
+  width: var(--thick);
+  transform: rotateY(90deg);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 1px, #00000012 1px 2px),
+    linear-gradient(90deg, #d8d0bf, #f6f1e6 30%, #efe8da 75%, #c9bfac);
+  box-shadow: inset 0 0 6px #0000001f;
+}
+[data-theme="dark"] .book-pages {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 1px, #00000024 1px 2px),
+    linear-gradient(90deg, #8f887b, #c9c2b3 30%, #bdb5a5 75%, #7d766a);
+}
+/* 封面高光：悬停时一道光掠过纸面。 */
+.book-3d > .book-cover::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 35%,
+    rgb(255 255 255 / 0.22) 48%,
+    transparent 60%
+  );
+  transform: translateX(-120%);
+  transition: transform 0.7s var(--ease);
+}
+.book-card:hover .book-3d > .book-cover::before {
+  transform: translateX(120%);
+}
+.book-3d.is-small {
+  --thick: 10px;
+  width: 96px;
+  height: 140px;
+  flex: none;
+}
+.recent-book .book-3d > .book-cover {
+  border-radius: 3px 6px 6px 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .book-3d,
+  .book-card:hover .book-3d {
+    transform: none;
+  }
 }

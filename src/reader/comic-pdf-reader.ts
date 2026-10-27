@@ -22,6 +22,7 @@ import { applyPaperTheme } from "./paper-theme";
 import { ImagePages } from "./image-page-cache";
 import { VerticalPages } from "./comic-scroll-reader";
 import { ImageFrame } from "./image-page-view";
+import { IMAGE_EXTENSION } from "./formats";
 import { pageViews, type ViewRect } from "./page-crop";
 import { ThumbnailStore, THUMBNAIL_HEIGHT, imageThumbnail } from "./thumbnails";
 import { spreadPages, turnPage } from "./spread-layout";
@@ -36,7 +37,6 @@ import {
 import type { TurnGesture } from "./reading-input";
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
-export const IMAGE_EXTENSION = /\.(?:png|jpe?g|webp|avif|gif|bmp)$/i;
 const collator = new Intl.Collator("zh-CN", {
   numeric: true,
   sensitivity: "base",
@@ -655,6 +655,7 @@ export class ComicPdfReader implements ReaderEngine {
     const frame = this.pageFrame(viewport);
     const columns = this.isDouble() ? 2 : 1;
     spread.style.gridTemplateColumns = `repeat(${columns}, minmax(0, 1fr))`;
+    spread.classList.toggle("has-spine", columns === 2 && this.style.spine);
     spread.style.width = `${frame.width}px`;
     spread.style.height = `${frame.height}px`;
     spread.style.marginTop = `${Math.max(0, (viewport.height - frame.height) / 2)}px`;
@@ -832,6 +833,7 @@ export class ComicPdfReader implements ReaderEngine {
       this.enhancingPage = undefined;
       await this.render();
     } else if (old.zoom !== style.zoom) await this.resize();
+    else if (old.spine !== style.spine) this.layoutSpread();
   }
   async dispose() {
     if (this.disposed) return;

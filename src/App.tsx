@@ -46,7 +46,6 @@ import {
   pickNativeBooks,
   removeNativeBook,
 } from "./file-sources";
-import { createEngine } from "./reader/create-reader";
 import {
   isInteractive,
   keyAction,
@@ -549,6 +548,8 @@ export default function App() {
                   },
                 }));
             };
+            // 阅读引擎（PDF.js、foliate、卷页）只在第一次打开书时加载，书架启动更快。
+            const { createEngine } = await import("./reader/create-reader");
             reader = await createEngine(
               source,
               styleRef.current,

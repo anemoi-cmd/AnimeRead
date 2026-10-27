@@ -225,6 +225,21 @@ export function Preferences({
             </label>
           </>
         )}
+        <label className="switch-row">
+          <span>
+            书脊阴影
+            <small>双页阅读时在中缝显示装订处的阴影，更像纸质书</small>
+          </span>
+          <input
+            type="checkbox"
+            aria-label="书脊阴影"
+            checked={style.spine}
+            disabled={
+              style.comicLayout !== "double" || style.direction === "ttb"
+            }
+            onChange={(event) => setStyle({ spine: event.target.checked })}
+          />
+        </label>
       </div>
       {comic && (
         <div className="setting-group">

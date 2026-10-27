@@ -375,6 +375,10 @@ export class NovelReader implements ReaderEngine {
       "novel-spread",
       columns === 2 && this.snapshot.reflow,
     );
+    this.host?.classList.toggle(
+      "has-spine",
+      columns === 2 && this.snapshot.reflow && this.style.spine,
+    );
     renderer.toggleAttribute("force-spread", columns === 2);
     renderer.setAttribute("max-column-count", String(columns));
     renderer.setAttribute(
@@ -543,7 +547,7 @@ export class NovelReader implements ReaderEngine {
     this.unbind.forEach((unbind) => unbind());
     this.unbind.clear();
     this.unbindHost?.();
-    this.host?.classList.remove("novel-spread", "fixed-surface");
+    this.host?.classList.remove("novel-spread", "has-spine", "fixed-surface");
     try {
       this.view?.close();
     } catch {

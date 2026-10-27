@@ -1,4 +1,4 @@
-//! Waifu2x 硬件能力检测与有界推理队列。
+//! Waifu2x 硬件能力检测与有界、可批处理的推理队列。
 //! 只使用真实 Vulkan 显卡（独显／核显），不运行 CPU 模型或 CPU 重试。
 //! 队列限制、代次取消和子进程超时共同保证翻页／关闭不会被推理阻塞；
 //! 临时目录通过 RAII 清理，失败交给前端保留原图。
@@ -9,11 +9,11 @@ use std::os::windows::process::CommandExt;
 use std::{
     fs,
     io::Cursor,
-    path::PathBuf,
+    path::{Path, PathBuf},
     process::{Child, Command, ExitStatus, Stdio},
     sync::{
-        atomic::{AtomicU64, AtomicUsize, Ordering},
-        Mutex,
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        mpsc, Mutex,
     },
     time::{Duration, Instant},
 };
@@ -35,7 +35,9 @@ pub struct EnhanceOptions {
 #[derive(Default)]
 pub struct EnhancementState {
     info: Mutex<Option<RuntimeInfo>>,
-    jobs: Mutex<()>,
+    /// 等待批处理的页面；worker 表示后台批处理线程是否在运行。
+    queue: Mutex<Vec<BatchItem>>,
+    worker: AtomicBool,
     generation: AtomicU64,
     pending: AtomicUsize,
 }
@@ -301,90 +303,173 @@ pub async fn enhance_image(
     {
         return Err("增强参数或页面大小无效".into());
     }
-    let job_app = app.clone();
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        let state = job_app.state::<EnhancementState>();
-        let _queue = state.jobs.lock().map_err(|e| e.to_string())?;
+    // 交给后台批处理线程：排队中、滤镜相同的多页合成一批，Waifu2x 每一步
+    // 只启动一次进程，摊薄约 0.8 秒的显卡初始化和模型加载。
+    let (reply, result) = mpsc::channel();
+    state
+        .queue
+        .lock()
+        .map_err(|e| e.to_string())?
+        .push(BatchItem {
+            bytes,
+            filters: options.filters,
+            generation,
+            reply,
+        });
+    if !state.worker.swap(true, Ordering::SeqCst) {
+        let worker_app = app.clone();
+        std::thread::spawn(move || batch_worker(worker_app));
+    }
+    let output = tauri::async_runtime::spawn_blocking(move || {
+        result
+            .recv()
+            .unwrap_or_else(|_| Err("增强任务已中断".into()))
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    Ok(tauri::ipc::Response::new(output))
+}
+
+pub struct BatchItem {
+    bytes: Vec<u8>,
+    filters: Vec<String>,
+    generation: u64,
+    reply: mpsc::Sender<Result<Vec<u8>, String>>,
+}
+type PageResult = Result<Vec<u8>, String>;
+/// 后台线程：短暂收集同时到达的请求，按滤镜链分组处理；队列清空即退出。
+fn batch_worker(app: tauri::AppHandle) {
+    let state = app.state::<EnhancementState>();
+    loop {
+        std::thread::sleep(Duration::from_millis(80));
+        let items = {
+            let Ok(mut queue) = state.queue.lock() else {
+                state.worker.store(false, Ordering::SeqCst);
+                return;
+            };
+            // 持有队列锁时判断并退出：新请求要么被本轮取走，要么会启动新线程。
+            if queue.is_empty() {
+                state.worker.store(false, Ordering::SeqCst);
+                return;
+            }
+            std::mem::take(&mut *queue)
+        };
+        let current = state.generation.load(Ordering::SeqCst);
+        let mut groups: Vec<(Vec<String>, Vec<BatchItem>)> = Vec::new();
+        for item in items {
+            if item.generation != current {
+                let _ = item.reply.send(Err("增强任务已取消".into()));
+                continue;
+            }
+            match groups
+                .iter_mut()
+                .find(|(filters, _)| *filters == item.filters)
+            {
+                Some((_, members)) => members.push(item),
+                None => groups.push((item.filters.clone(), vec![item])),
+            }
+        }
+        for (filters, members) in groups {
+            let inputs: Vec<&[u8]> = members.iter().map(|item| item.bytes.as_slice()).collect();
+            let results = match run_batch(&app, &filters, &inputs, current) {
+                Ok(results) => results,
+                Err(error) => members.iter().map(|_| Err(error.clone())).collect(),
+            };
+            for (item, result) in members.into_iter().zip(results) {
+                let _ = item.reply.send(result);
+            }
+        }
+    }
+}
+/// 检查一页的格式和输出尺寸，写入第一步目录，返回原图尺寸。
+fn stage_input(
+    directory: &Path,
+    index: usize,
+    bytes: &[u8],
+    scale: u32,
+) -> Result<(u32, u32), String> {
+    // 漫画原文件多为 JPEG；直接交给 Waifu2x，免去前端 PNG 重新编码。
+    let format = image::guess_format(bytes).map_err(|e| e.to_string())?;
+    let extension = match format {
+        ImageFormat::Png => "png",
+        ImageFormat::Jpeg => "jpg",
+        ImageFormat::WebP => "webp",
+        _ => return Err("增强输入只支持 PNG、JPEG 或 WebP".into()),
+    };
+    let (width, height) = image::ImageReader::with_format(Cursor::new(bytes), format)
+        .into_dimensions()
+        .map_err(|e| e.to_string())?;
+    let pixels = u64::from(width) * u64::from(height) * u64::from(scale * scale);
+    if width == 0 || height == 0 || pixels > 80_000_000 {
+        return Err("滤镜链输出最多 8000 万像素，请减少叠加次数".into());
+    }
+    fs::write(directory.join(format!("{index}.{extension}")), bytes).map_err(|e| e.to_string())?;
+    Ok((width, height))
+}
+/// 一批页面依次执行滤镜链；单页的格式或尺寸问题只影响这一页。
+fn run_batch(
+    app: &tauri::AppHandle,
+    filters: &[String],
+    inputs: &[&[u8]],
+    generation: u64,
+) -> Result<Vec<PageResult>, String> {
+    let state = app.state::<EnhancementState>();
+    let runtime = runtime_info(&state)?;
+    let gpu_id = runtime
+        .gpu_id
+        .filter(|id| *id >= 0)
+        .ok_or("未检测到可用显卡，超分已停止，保留原图")?;
+    let directory = runtime_directory().ok_or("增强扩展不存在")?;
+    let parent = if std::env::var_os("ANIMEREAD_DATA_DIR").is_some() {
+        crate::book_library::library_path(app)?.with_file_name("cache")
+    } else {
+        app.path().app_cache_dir().map_err(|e| e.to_string())?
+    }
+    .join("enhance-jobs");
+    fs::create_dir_all(&parent).map_err(|e| e.to_string())?;
+    let job = TemporaryJob(parent.join(uuid::Uuid::new_v4().to_string()));
+    let mut step = job.0.join("step-0");
+    fs::create_dir_all(&step).map_err(|e| e.to_string())?;
+    let scale = 2u32.pow(filters.iter().filter(|mode| mode.as_str() == "A").count() as u32);
+    let mut results: Vec<PageResult> = Vec::with_capacity(inputs.len());
+    let mut sizes = Vec::with_capacity(inputs.len());
+    let mut live = Vec::with_capacity(inputs.len());
+    for (index, bytes) in inputs.iter().enumerate() {
+        match stage_input(&step, index, bytes, scale) {
+            Ok(size) => {
+                sizes.push(size);
+                live.push(index);
+                results.push(Ok(Vec::new()));
+            }
+            Err(error) => {
+                sizes.push((0, 0));
+                results.push(Err(error));
+            }
+        }
+    }
+    if live.is_empty() {
+        return Ok(results);
+    }
+    for (number, mode) in filters.iter().enumerate() {
         if state.generation.load(Ordering::SeqCst) != generation {
             return Err("增强任务已取消".into());
         }
-        let runtime = runtime_info(&state)?;
-        let gpu_id = runtime
-            .gpu_id
-            .filter(|id| *id >= 0)
-            .ok_or("未检测到可用显卡，超分已停止，保留原图")?;
-        let directory = runtime_directory().ok_or("增强扩展不存在")?;
-        // 漫画原文件多为 JPEG；直接交给 Waifu2x，免去前端 PNG 重新编码。
-        let format = image::guess_format(&bytes).map_err(|e| e.to_string())?;
-        let extension = match format {
-            ImageFormat::Png => "png",
-            ImageFormat::Jpeg => "jpg",
-            ImageFormat::WebP => "webp",
-            _ => return Err("增强输入只支持 PNG、JPEG 或 WebP".into()),
-        };
-        let decoder = image::ImageReader::with_format(Cursor::new(&bytes), format);
-        let (mut width, mut height) = decoder.into_dimensions().map_err(|e| e.to_string())?;
-        let scale = 2u64.pow(
-            options
-                .filters
-                .iter()
-                .filter(|mode| mode.as_str() == "A")
-                .count() as u32,
-        );
-        if width == 0
-            || height == 0
-            || u64::from(width) * u64::from(height) * scale * scale > 80_000_000
-        {
-            return Err("滤镜链输出最多 8000 万像素，请减少叠加次数".into());
-        }
-        let parent = if std::env::var_os("ANIMEREAD_DATA_DIR").is_some() {
-            crate::book_library::library_path(&job_app)?.with_file_name("cache")
+        let next = job.0.join(format!("step-{}", number + 1));
+        fs::create_dir_all(&next).map_err(|e| e.to_string())?;
+        let factor = if mode == "A" { 2 } else { 1 };
+        if mode == "B" {
+            for &index in &live {
+                soften(&staged(&step, index)?, &next.join(format!("{index}.png")))?;
+            }
         } else {
-            job_app.path().app_cache_dir().map_err(|e| e.to_string())?
-        }
-        .join("enhance-jobs");
-        fs::create_dir_all(&parent).map_err(|e| e.to_string())?;
-        let job = TemporaryJob(parent.join(uuid::Uuid::new_v4().to_string()));
-        fs::create_dir(&job.0).map_err(|e| e.to_string())?;
-        let mut input = job.0.join(format!("input.{extension}"));
-        fs::write(&input, bytes).map_err(|e| e.to_string())?;
-        for (index, mode) in options.filters.iter().enumerate() {
-            if state.generation.load(Ordering::SeqCst) != generation {
-                return Err("增强任务已取消".into());
-            }
-            let factor = if mode == "A" { 2 } else { 1 };
+            // 分块大小交给 ncnn 按显存自动选择（独显通常 400）；整批只启动一次。
             let noise = if mode == "C" { 2 } else { -1 };
-            let output = job.0.join(format!("step-{index}.png"));
-            if mode == "B" {
-                let mut image = image::open(&input).map_err(|e| e.to_string())?.to_rgba8();
-                let blurred = image::imageops::blur(&image, 0.55);
-                for (original, smooth) in image.pixels_mut().zip(blurred.pixels()) {
-                    let difference = original.0[..3]
-                        .iter()
-                        .zip(&smooth.0[..3])
-                        .map(|(&a, &b)| (f32::from(a) - f32::from(b)).abs())
-                        .sum::<f32>()
-                        / 3.0;
-                    let blend = 0.3 * (difference / 18.0).clamp(0.0, 1.0);
-                    for (channel, softened) in original.0[..3].iter_mut().zip(&smooth.0[..3]) {
-                        *channel = (*channel as f32 * (1.0 - blend) + *softened as f32 * blend)
-                            .round() as u8;
-                    }
-                }
-                image.save(&output).map_err(|e| e.to_string())?;
-                input = output;
-                continue;
-            }
-            // 单次 GPU 任务只有一个真实显卡设备；失败立即返回原图，不再
-            // 偷偷转入不可用的 CPU 模型。进程等待仍受取消和超时约束。
-            // 分块大小交给 ncnn 按显存自动选择（独显通常 400），固定 128
-            // 会让大显存显卡做大量小块调度，速度只有自动值的几分之一。
-            let log = job.0.join(format!("step-{index}.log"));
+            let log = job.0.join(format!("step-{number}.log"));
             let child = command(&directory)
                 .arg("-i")
-                .arg(&input)
+                .arg(&step)
                 .arg("-o")
-                .arg(&output)
+                .arg(&next)
                 .args([
                     "-s",
                     &factor.to_string(),
@@ -396,6 +481,8 @@ pub async fn enhance_image(
                     &gpu_id.to_string(),
                     "-j",
                     "1:2:2",
+                    "-f",
+                    "png",
                 ])
                 .arg("-m")
                 .arg(directory.join("models-cunet"))
@@ -403,7 +490,8 @@ pub async fn enhance_image(
                 .stderr(fs::File::create(&log).map_err(|e| e.to_string())?)
                 .spawn()
                 .map_err(|e| e.to_string())?;
-            let status = wait_for_child(child, Duration::from_secs(90), || {
+            let timeout = Duration::from_secs(90 + 30 * live.len() as u64);
+            let status = wait_for_child(child, timeout, || {
                 state.generation.load(Ordering::SeqCst) != generation
             })?;
             if !status.success() {
@@ -416,22 +504,54 @@ pub async fn enhance_image(
                         .collect::<String>()
                 ));
             }
-            let (actual_width, actual_height) = image::ImageReader::open(&output)
-                .map_err(|e| e.to_string())?
-                .into_dimensions()
-                .map_err(|e| e.to_string())?;
-            width *= factor;
-            height *= factor;
-            if (actual_width, actual_height) != (width, height) {
-                return Err("增强输出尺寸不匹配".into());
-            }
-            input = output;
         }
-        fs::read(input).map_err(|e| e.to_string())
-    })
-    .await
-    .map_err(|e| e.to_string())??;
-    Ok(tauri::ipc::Response::new(result))
+        // 逐页核对输出尺寸，有问题的页单独报错，不影响同批其他页。
+        live.retain(|&index| {
+            let (width, height) = sizes[index];
+            let expected = (width * factor, height * factor);
+            let actual = image::ImageReader::open(next.join(format!("{index}.png")))
+                .ok()
+                .and_then(|reader| reader.into_dimensions().ok());
+            if actual == Some(expected) {
+                sizes[index] = expected;
+                true
+            } else {
+                results[index] = Err("增强输出尺寸不匹配".into());
+                false
+            }
+        });
+        step = next;
+    }
+    for &index in &live {
+        results[index] = fs::read(step.join(format!("{index}.png"))).map_err(|e| e.to_string());
+    }
+    Ok(results)
+}
+/// 第一步输入保留原扩展名；之后各步统一为 PNG。
+fn staged(directory: &Path, index: usize) -> Result<PathBuf, String> {
+    ["png", "jpg", "webp"]
+        .iter()
+        .map(|extension| directory.join(format!("{index}.{extension}")))
+        .find(|path| path.is_file())
+        .ok_or_else(|| "增强中间文件缺失".to_string())
+}
+/// B：保持尺寸的轻量边缘柔和，CPU 完成。
+fn soften(input: &Path, output: &Path) -> Result<(), String> {
+    let mut image = image::open(input).map_err(|e| e.to_string())?.to_rgba8();
+    let blurred = image::imageops::blur(&image, 0.55);
+    for (original, smooth) in image.pixels_mut().zip(blurred.pixels()) {
+        let difference = original.0[..3]
+            .iter()
+            .zip(&smooth.0[..3])
+            .map(|(&a, &b)| (f32::from(a) - f32::from(b)).abs())
+            .sum::<f32>()
+            / 3.0;
+        let blend = 0.3 * (difference / 18.0).clamp(0.0, 1.0);
+        for (channel, softened) in original.0[..3].iter_mut().zip(&smooth.0[..3]) {
+            *channel = (*channel as f32 * (1.0 - blend) + *softened as f32 * blend).round() as u8;
+        }
+    }
+    image.save(output).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

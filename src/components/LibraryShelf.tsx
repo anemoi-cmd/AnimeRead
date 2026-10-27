@@ -185,10 +185,14 @@ export function LibraryShelf({
             aria-label={`继续阅读 ${recentTitle}`}
           >
             {covers[recent.id] ? (
-              <img
-                src={covers[recent.id]}
-                alt={`上次阅读 ${recentTitle} 封面`}
-              />
+              <span className="book-3d is-small">
+                <span className="book-pages" aria-hidden="true" />
+                <img
+                  className="book-cover"
+                  src={covers[recent.id]}
+                  alt={`上次阅读 ${recentTitle} 封面`}
+                />
+              </span>
             ) : (
               <BookOpen size={48} />
             )}
@@ -297,20 +301,23 @@ export function LibraryShelf({
                 aria-label={`打开分组 ${entry.group.name}`}
                 onClick={() => groupChange(entry.group.id)}
               >
-                <div className="book-cover cover-sage">
-                  {covers[groupCovers[entry.group.id]] ? (
-                    <img
-                      className="cover-image"
-                      data-cover-book={groupCovers[entry.group.id]}
-                      src={covers[groupCovers[entry.group.id]]}
-                      alt={`${entry.group.name} 分组封面`}
-                    />
-                  ) : (
-                    <FolderOpen size={44} />
-                  )}
-                  <span className="group-volume-count">
-                    {entry.group.bookIds.length} 卷
-                  </span>
+                <div className="book-3d">
+                  <span className="book-pages" aria-hidden="true" />
+                  <div className="book-cover cover-sage">
+                    {covers[groupCovers[entry.group.id]] ? (
+                      <img
+                        className="cover-image"
+                        data-cover-book={groupCovers[entry.group.id]}
+                        src={covers[groupCovers[entry.group.id]]}
+                        alt={`${entry.group.name} 分组封面`}
+                      />
+                    ) : (
+                      <FolderOpen size={44} />
+                    )}
+                    <span className="group-volume-count">
+                      {entry.group.bookIds.length} 卷
+                    </span>
+                  </div>
                 </div>
                 <h3>{entry.group.name}</h3>
                 <div className="book-reading-time">

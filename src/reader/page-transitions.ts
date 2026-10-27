@@ -14,6 +14,8 @@ interface PageSurface {
   element: HTMLElement;
   sheets: HTMLElement[];
   spread: boolean;
+  /** 双页且开启书脊阴影：快照里已含中缝，卷页时舞台上也要画。 */
+  spine: boolean;
   width: number;
   height: number;
   left: number;
@@ -21,6 +23,12 @@ interface PageSurface {
   anchor: string;
 }
 
+/** 中缝阴影元素，样式与静态双页的书脊相同。 */
+function spineElement() {
+  const spine = document.createElement("div");
+  spine.className = "page-spine";
+  return spine;
+}
 /** Rendering a new fixed page must retain the opaque old-page cover. */
 export function replacePageContent(host: HTMLElement, ...nodes: Node[]) {
   const cover = host.querySelector(":scope > .turn-cover");
@@ -56,8 +64,6 @@ export async function turnPageSurface(
         : undefined;
     if (before) {
       cover.className = "turn-cover";
-      if (before.spread && host.classList.contains("novel-spread"))
-        cover.classList.add("has-novel-spine");
       cover.style.background = THEME_COLORS[style.theme].background;
       before.element.style.cssText += `;position:absolute;left:${before.left}px;top:${before.top}px;width:${before.width}px;height:${before.height}px`;
       cover.append(before.element);
@@ -188,10 +194,13 @@ export function captureFixedPage(
       return copy;
     }),
   );
+  const spine = slots.length === 2 && paper.classList.contains("has-spine");
+  if (spine) element.append(spineElement());
   return {
     element,
     sheets,
     spread: slots.length === 2,
+    spine,
     width: rect.width,
     height: rect.height,
     left: rect.left - parent.left,
@@ -381,10 +390,13 @@ export async function captureNovelPage(
     sheet.style.position = "relative";
     sheet.style.left = "";
   });
+  const spine = spread && host.classList.contains("has-spine");
+  if (spine) element.append(spineElement());
   return {
     element,
     sheets,
     spread,
+    spine,
     width: hostRect.width,
     height: hostRect.height,
     left: 0,
@@ -489,6 +501,13 @@ async function curlPage(
         }
       });
       flip!.on("init", () => {
+        // 中缝阴影留在卷页舞台最上层：静止的两页始终有书脊，翻起的纸张
+        // 经过中缝时同样带一点阴影，像纸页弯进装订处。
+        if (spread && before.spine) {
+          const spine = spineElement();
+          spine.classList.add("curl-spine");
+          stage.append(spine);
+        }
         // Let the renderer establish its RAF clock before starting the motion.
         animationRequest = requestAnimationFrame(() => {
           overlay.style.opacity = "1";

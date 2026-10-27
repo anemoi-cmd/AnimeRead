@@ -10,7 +10,8 @@ import type {
 } from "../reader-types";
 import { BookArchive } from "./book-archive";
 import { NovelReader } from "./novel-reader";
-import { ComicPdfReader, IMAGE_EXTENSION } from "./comic-pdf-reader";
+import { ComicPdfReader } from "./comic-pdf-reader";
+import { IMAGE_EXTENSION } from "./formats";
 import type { ReadingMove } from "./reading-input";
 import { inspectEpub } from "./epub-inspection";
 

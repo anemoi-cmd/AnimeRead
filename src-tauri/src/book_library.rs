@@ -36,6 +36,10 @@ pub fn file_stamp(path: &Path) -> Result<(u64, String), String> {
     let metadata = fs::metadata(path).map_err(|_| {
         "原文件已移动或不存在，请重新拖入文件以更新位置；也可以右键删除书目".to_string()
     })?;
+    metadata_stamp(&metadata)
+}
+/// 大小与修改时间组成的版本戳；已打开的文件句柄也可直接取用。
+pub fn metadata_stamp(metadata: &fs::Metadata) -> Result<(u64, String), String> {
     if !metadata.is_file() {
         return Err("请选择书籍文件".into());
     }

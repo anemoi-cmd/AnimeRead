@@ -85,6 +85,7 @@
 | reader/image-page-view.ts | 固定原图尺寸和可拖动画质对比 |
 | reader/page-crop.ts | 白边检测、跨页拆分，给出每页的显示区域 |
 | reader/thumbnails.ts | 页面缩略图的按需生成、并发限制与释放 |
+| reader/formats.ts | 支持的图片扩展名，供书架和阅读引擎共用 |
 | reader/comic-scroll-reader.ts | 最多五页的漫画上下阅读、拖动与页顶对齐 |
 | reader/spread-layout.ts | 双页分组、封面与翻页步长 |
 | reader/page-transitions.ts | 共用翻页事务、包含留白的页面快照、准备遮罩、书脊卷页、滑动过渡 |

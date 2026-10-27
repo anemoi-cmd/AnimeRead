@@ -31,22 +31,25 @@ export const BookCard = memo(function BookCard({
       }}
       onClick={() => void open(book)}
     >
-      <div
-        className={`book-cover cover-${["sage", "sand", "slate", "rose"][index % 4]}`}
-      >
-        {cover ? (
-          <img className="cover-image" src={cover} alt={`${title} 封面`} />
-        ) : (
-          <>
-            <span className="cover-rule" />
-            <strong>{title}</strong>
-            <span className="cover-author">
-              {saved?.author || "你的阅读收藏"}
-            </span>
-            <BookOpen className="cover-symbol" size={38} strokeWidth={0.8} />
-            <span className="cover-spine" />
-          </>
-        )}
+      <div className="book-3d">
+        <span className="book-pages" aria-hidden="true" />
+        <div
+          className={`book-cover cover-${["sage", "sand", "slate", "rose"][index % 4]}`}
+        >
+          {cover ? (
+            <img className="cover-image" src={cover} alt={`${title} 封面`} />
+          ) : (
+            <>
+              <span className="cover-rule" />
+              <strong>{title}</strong>
+              <span className="cover-author">
+                {saved?.author || "你的阅读收藏"}
+              </span>
+              <BookOpen className="cover-symbol" size={38} strokeWidth={0.8} />
+              <span className="cover-spine" />
+            </>
+          )}
+        </div>
       </div>
       <h3 title={title}>{title}</h3>
       <p>

@@ -3,7 +3,7 @@ import type { ByteSource, ShelfBook as CoverBook } from "./reader-types";
 import { readWhole } from "./file-sources";
 import { BookArchive } from "./reader/book-archive";
 import { epubCover } from "./reader/epub-inspection";
-import { IMAGE_EXTENSION, openSourcePdf } from "./reader/comic-pdf-reader";
+import { IMAGE_EXTENSION } from "./reader/formats";
 import {
   coverKey,
   readMedia,
@@ -15,6 +15,8 @@ const inFlight = new Map<string, Promise<Blob | undefined>>();
 async function extractCover(source: ByteSource) {
   const header = await source.readAt(0, 4);
   if (header[0] === 0x25 && header[1] === 0x50) {
+    // PDF.js 体积较大，只有书架上真有 PDF 时才加载。
+    const { openSourcePdf } = await import("./reader/comic-pdf-reader");
     const task = await openSourcePdf(source, () => void task.destroy());
     task.onPassword = () => void task.destroy();
     try {

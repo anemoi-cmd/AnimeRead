@@ -2,15 +2,14 @@
 mod app_updates;
 mod book_library;
 mod gpu_enhancement;
-use book_library::{book_info, file_stamp, merge_book, persist_library, LocalBook, SUPPORTED};
+use book_library::{book_info, merge_book, metadata_stamp, persist_library, LocalBook, SUPPORTED};
 
 use serde::Serialize;
 use std::{
     collections::{BTreeSet, HashMap},
     fs::File,
-    io::{Read, Seek, SeekFrom},
-    path::{Path, PathBuf},
-    sync::Mutex,
+    path::Path,
+    sync::{Arc, Mutex},
 };
 use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
@@ -27,10 +26,33 @@ struct SourceInfo {
     format: String,
 }
 
+/// 打开的书保持一个文件句柄，按位置读取，不再每次重新打开。Windows 上
+/// 标准库以允许删除/改名的共享方式打开，用户仍可移动或替换原文件。
 struct LocalSource {
-    path: PathBuf,
+    file: Arc<File>,
     revision: String,
     size: u64,
+}
+/// 从指定位置读满缓冲区；多个读取可同时使用同一句柄。
+fn read_exact_at(file: &File, buffer: &mut [u8], offset: u64) -> std::io::Result<()> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::fs::FileExt;
+        let mut done = 0;
+        while done < buffer.len() {
+            let count = file.seek_read(&mut buffer[done..], offset + done as u64)?;
+            if count == 0 {
+                return Err(std::io::ErrorKind::UnexpectedEof.into());
+            }
+            done += count;
+        }
+        Ok(())
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::FileExt;
+        file.read_exact_at(buffer, offset)
+    }
 }
 #[derive(Default)]
 struct ReaderState {
@@ -147,7 +169,10 @@ async fn open_book(app: tauri::AppHandle, id: String) -> Result<SourceInfo, Stri
             .find(|x| x.id == id)
             .cloned()
             .ok_or("书目不存在")?;
-        let (size, stamp) = file_stamp(Path::new(&book.path))?;
+        let file = File::open(&book.path).map_err(|_| {
+            "原文件已移动或不存在，请重新拖入文件以更新位置；也可以右键删除书目".to_string()
+        })?;
+        let (size, stamp) = metadata_stamp(&file.metadata().map_err(|e| e.to_string())?)?;
         let revision = if stamp == book.stamp {
             book.revision
         } else {
@@ -157,7 +182,7 @@ async fn open_book(app: tauri::AppHandle, id: String) -> Result<SourceInfo, Stri
         state.sources.lock().map_err(|e| e.to_string())?.insert(
             source_id.clone(),
             LocalSource {
-                path: PathBuf::from(&book.path),
+                file: Arc::new(file),
                 revision: stamp,
                 size,
             },
@@ -186,14 +211,15 @@ async fn read_source(
         return Err("单次读取超过 8 MiB".into());
     }
     let offset = offset.parse::<u64>().map_err(|_| "字节偏移无效")?;
-    let (path, revision, size) = {
+    let (file, revision, size) = {
         let state = app.state::<ReaderState>();
         let sources = state.sources.lock().map_err(|e| e.to_string())?;
         let source = sources.get(&source_id).ok_or("书籍已关闭")?;
-        (source.path.clone(), source.revision.clone(), source.size)
+        (source.file.clone(), source.revision.clone(), source.size)
     };
     let bytes = tauri::async_runtime::spawn_blocking(move || {
-        let (_, stamp) = file_stamp(&path)?;
+        // 原文件被原地改写时版本戳变化；被替换时句柄仍指向打开时的内容。
+        let (_, stamp) = metadata_stamp(&file.metadata().map_err(|e| e.to_string())?)?;
         if stamp != revision {
             return Err("SOURCE_CHANGED：原文件已更新，请重新打开".to_string());
         }
@@ -201,11 +227,8 @@ async fn read_source(
             return Err("读取位置超过文件末尾".to_string());
         }
         let available = length.min((size - offset) as usize);
-        let mut file = File::open(&path).map_err(|e| e.to_string())?;
-        file.seek(SeekFrom::Start(offset))
-            .map_err(|e| e.to_string())?;
         let mut bytes = vec![0u8; available];
-        file.read_exact(&mut bytes).map_err(|e| e.to_string())?;
+        read_exact_at(&file, &mut bytes, offset).map_err(|e| e.to_string())?;
         Ok(bytes)
     })
     .await

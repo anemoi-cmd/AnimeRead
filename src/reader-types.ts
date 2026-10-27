@@ -53,6 +53,8 @@ export interface ReaderStyle {
   cropMargins: boolean;
   /** 单页模式下把横向跨页拆成两半依次显示。 */
   splitSpreads: boolean;
+  /** 双页时在中缝显示书脊阴影。 */
+  spine: boolean;
   enhanceEnabled: boolean;
   enhanceBackend: "anime4k" | "waifu2x";
   filters: FilterMode[];
@@ -130,6 +132,7 @@ export const DEFAULT_STYLE: ReaderStyle = {
   comicLayout: "single",
   cropMargins: true,
   splitSpreads: false,
+  spine: true,
   enhanceBackend: "anime4k",
   filters: ["A"],
 };
